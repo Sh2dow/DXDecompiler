@@ -363,6 +363,8 @@ namespace DXDecompiler.DX9Shader
 				case RegisterType.RastOut:
 				case RegisterType.Output:
 				case RegisterType.AttrOut:
+				case RegisterType.DepthOut:
+					return (MethodOutputRegisters.Count == 1) ? "out_" + decl.Name : ("o." + decl.Name);
 				case RegisterType.ColorOut:
 					return (MethodOutputRegisters.Count == 1) ? "out_" + decl.Name : ("o." + decl.Name);
 				case RegisterType.Const:

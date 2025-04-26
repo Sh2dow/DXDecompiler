@@ -17,7 +17,7 @@
 		Output = TexCoordOut,
 		ConstInt,
 		ColorOut,
-		DepthOut,
+		DepthOut, // Pixel shader depth output (scalar)
 		Sampler,
 		Const2,
 		Const3,

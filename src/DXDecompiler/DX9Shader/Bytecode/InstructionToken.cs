@@ -270,10 +270,23 @@ namespace DXDecompiler.DX9Shader
 			return (ResultModifier)((Data[destIndex] >> 20) & 0xF);
 		}
 
+		/// <summary>
+		/// Gets the write mask for the destination operand. For depth output, this is always forced to X component
+		/// since depth is a scalar value.
+		/// </summary>
+		/// <returns>The component flags representing the write mask</returns>
 		public ComponentFlags GetDestinationWriteMask()
 		{
 			int destIndex = GetDestinationParamIndex();
-			return (ComponentFlags)((Data[destIndex] >> 16) & 0xF);
+			var writeMask = (ComponentFlags)((Data[destIndex] >> 16) & 0xF);
+			
+			// Depth output is always a scalar (float), so force X component only for oDepth
+			if (GetParamRegisterType(destIndex) == RegisterType.DepthOut)
+			{
+				return ComponentFlags.X;
+			}
+			
+			return writeMask;
 		}
 
 		public string GetDestinationWriteMaskName(uint destinationLength, bool hlsl)

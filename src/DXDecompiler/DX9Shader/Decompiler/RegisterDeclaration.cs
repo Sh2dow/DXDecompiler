@@ -47,7 +47,7 @@ namespace DXDecompiler.DX9Shader
 					case 4:
 						return "float4";
 					default:
-						throw new InvalidOperationException();
+						throw new InvalidOperationException($"Invalid masked length: {MaskedLength}");
 				}
 			}
 		}
@@ -66,6 +66,9 @@ namespace DXDecompiler.DX9Shader
 					return "COLOR";
 				case RegisterType.RastOut: // in vs_2_0 (and / or below?), as output position register
 					return "POSITION";
+				case RegisterType.DepthOut:
+					// Depth is a special scalar output for pixel shaders
+					return "DEPTH";
 				case RegisterType.Const:
 				case RegisterType.Temp:
 				case RegisterType.ConstInt:

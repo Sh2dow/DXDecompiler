@@ -23,7 +23,10 @@ namespace DXDecompiler.DX9Shader
 				var body = Body;
 				if(Literals is not null)
 				{
-					body += string.Format("{0}({1})", Literals.Length, string.Join(", ", Literals));
+					if (Literals.Length == 1)
+						body = Literals[0]; // Emit scalar as plain float
+					else
+						body = $"float{Literals.Length}({string.Join(", ", Literals)})";
 				}
 				body = string.Format(Modifier, body);
 				if(body.All(char.IsDigit))
@@ -192,12 +195,51 @@ namespace DXDecompiler.DX9Shader
 					ResultModifier.None => "{0} = {1};",
 					ResultModifier.Saturate => "{0} = saturate({1});",
 					ResultModifier.PartialPrecision => $"{{0}} = /* not implemented _pp modifier */ {{1}};",
+					ResultModifier.Saturate | ResultModifier.PartialPrecision => "{0} = /* saturate+_pp */ saturate({1});",
 					object unknown => ";// error"
 				};
 				var sourceResult = string.Format(sourceFormat, args);
 
 				var swizzleSizes = args.Select(x => x.Swizzle.StartsWith(".") ? x.Swizzle.Trim('.').Length : -1);
 				var returnsScalar = instruction.Opcode.ReturnsScalar() || swizzleSizes.All(x => x == 1);
+
+				// Generalized: Detect scalar output (MaskedLength == 1)
+				bool isScalarOutput = false;
+				if (instruction.HasDestination)
+				{
+					var destKey = instruction.GetParamRegisterKey(instruction.GetDestinationParamIndex());
+					var decl = _registers.RegisterDeclarations.ContainsKey(destKey) ? _registers.RegisterDeclarations[destKey] : null;
+					if (decl != null && decl.MaskedLength == 1)
+					{
+						isScalarOutput = true;
+					}
+				}
+
+				if (isScalarOutput)
+				{
+					for (int i = 0; i < args.Length; i++)
+					{
+						if (args[i].Literals != null && args[i].Literals.Length > 0)
+						{
+							args[i].Literals = new[] { args[i].Literals[0] };
+							args[i].Swizzle = "";
+						}
+						else if (!string.IsNullOrEmpty(args[i].Swizzle) && args[i].Swizzle != ".x")
+						{
+							args[i].Swizzle = ".x";
+						}
+						if (args[i].Body != null && args[i].Body.StartsWith("float"))
+						{
+							var start = args[i].Body.IndexOf('(');
+							var end = args[i].Body.IndexOf(',');
+							if (start >= 0 && end > start)
+							{
+								args[i].Body = args[i].Body.Substring(start + 1, end - start - 1).Trim();
+							}
+						}
+					}
+					sourceResult = string.Format(sourceFormat, args);
+				}
 
 				if(writeMask.Length > 0)
 				{
@@ -293,6 +335,7 @@ namespace DXDecompiler.DX9Shader
 					break;
 				case Opcode.Cmp:
 					// TODO: should be per-component
+					// TODO: Handle depth output
 					WriteAssignment("({0} >= 0) ? {1} : {2}",
 						GetSourceName(instruction, 1), GetSourceName(instruction, 2), GetSourceName(instruction, 3));
 					break;
@@ -363,6 +406,37 @@ namespace DXDecompiler.DX9Shader
 					}
 					Indent++;
 					break;
+				case Opcode.BreakC:
+				{
+					string compareOp;
+					switch((IfComparison)instruction.Modifier)
+					{
+						case IfComparison.GT:
+							compareOp = ">";
+							break;
+						case IfComparison.EQ:
+							compareOp = "==";
+							break;
+						case IfComparison.GE:
+							compareOp = ">=";
+							break;
+						case IfComparison.LE:
+							compareOp = "<=";
+							break;
+						case IfComparison.NE:
+							compareOp = "!=";
+							break;
+						case IfComparison.LT:
+							compareOp = "<";
+							break;
+						default:
+							throw new InvalidOperationException();
+					}
+
+					// Write full if (...) break; into a single WriteLine
+					WriteLine("if ({0} {2} {1}) break;", GetSourceName(instruction, 0), GetSourceName(instruction, 1), compareOp);
+					break;
+				}
 				case Opcode.Log:
 					WriteAssignment("log2({0})", GetSourceName(instruction, 1));
 					break;

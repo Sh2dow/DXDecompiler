@@ -51,6 +51,7 @@
 					registerTypeName = "oC";
 					break;
 				case RegisterType.DepthOut:
+					// oDepth is the special DX9 pixel shader depth output register (always scalar)
 					registerTypeName = "oDepth";
 					break;
 				case RegisterType.AttrOut:
