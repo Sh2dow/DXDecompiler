@@ -33,7 +33,14 @@ namespace DXDecompiler.DX9Shader
 
 		private void Load(ShaderModel shader)
 		{
-			ConstantDeclarations = shader.ConstantTable.ConstantDeclarations;
+			if (shader.ConstantTable == null)
+			{
+				ConstantDeclarations = new List<ConstantDeclaration>();
+			}
+			else
+			{
+				ConstantDeclarations = shader.ConstantTable.ConstantDeclarations;
+			}
 
 			var isSm1PixelShader = shader is { Type: ShaderType.Pixel, MajorVersion: 1 };
 
@@ -532,7 +539,8 @@ namespace DXDecompiler.DX9Shader
 				case SourceModifier.SignAndNegate:
 					return "-{0}_bx2";
 				case SourceModifier.Complement:
-					throw new NotImplementedException();
+					// Complement: 1 - value
+					return "(1 - {0})";
 				case SourceModifier.X2:
 					return "(2 * {0})";
 				case SourceModifier.X2AndNegate:
@@ -546,7 +554,8 @@ namespace DXDecompiler.DX9Shader
 				case SourceModifier.AbsAndNegate:
 					return "-abs({0})";
 				case SourceModifier.Not:
-					throw new NotImplementedException();
+					// Not: bitwise not, not directly supported in HLSL, but for bool/int: ~value
+					return "~{0}";
 				default:
 					throw new NotImplementedException();
 			}

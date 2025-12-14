@@ -8,6 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using DXDecompiler.DX9Shader;
 
 namespace DXDecompilerCmd
 {
@@ -110,7 +111,7 @@ namespace DXDecompilerCmd
 				sw.WriteLine(preshaderPath);
 				StreamWriter preshaderFile = File.CreateText(preshaderPath);
 				// write inputs
-				DXDecompiler.DX9Shader.AsmWriter preshaderDisassembler = new DXDecompiler.DX9Shader.AsmWriter(shader.Preshader.Shader);
+				AsmWriter preshaderDisassembler = new AsmWriter(shader.Preshader.Shader);
 				preshaderDisassembler.SetStream(preshaderFile);
 				preshaderDisassembler.WriteConstantTable(shader.Preshader.Shader.ConstantTable);
 				foreach(var instruction in shader.Preshader.Shader.Fxlc.Tokens)

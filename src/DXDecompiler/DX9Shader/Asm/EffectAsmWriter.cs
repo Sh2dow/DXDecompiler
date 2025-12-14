@@ -3,6 +3,7 @@ using DXDecompiler.DX9Shader.Bytecode.Fxlvm;
 using DXDecompiler.DX9Shader.FX9;
 using System;
 using System.Linq;
+using DXDecompiler.DX9Shader;
 
 namespace DXDecompiler.DX9Shader
 {

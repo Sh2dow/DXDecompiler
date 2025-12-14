@@ -32,6 +32,7 @@ namespace DXDecompiler.DX9Shader.FX9
 			}
 			var nameReader = reader.CopyAtOffset((int)nameOffset);
 			result.Name = nameReader.TryReadString();
+			System.Diagnostics.Debug.WriteLine($"Parsed technique: {result.Name}");
 			return result;
 		}
 	}

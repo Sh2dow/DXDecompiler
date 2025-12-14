@@ -4,6 +4,7 @@ using DXDecompiler.Util;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using DXDecompiler.DX9Shader;
 
 namespace DXDecompiler.DX9Shader
 {
@@ -175,6 +176,10 @@ namespace DXDecompiler.DX9Shader
 					_iterationDepth--;
 					WriteIndent();
 					WriteLine("}");
+					return;
+				case Opcode.Phase:
+					// Phase: Used in ps_2_x and ps_3_0 to separate shader phases. No output needed in HLSL.
+					WriteLine("// phase");
 					return;
 			}
 			WriteIndent();
@@ -472,34 +477,21 @@ namespace DXDecompiler.DX9Shader
 					{
 						WriteTextureAssignment(string.Empty, GetSourceName(instruction, 2), GetSourceName(instruction, 1), null);
 					}
-					// shader model 1
-					else if(_shader.MinorVersion >= 4)
+					else if(_shader.MajorVersion == 1 && _shader.MinorVersion >= 4)
 					{
-						throw new NotImplementedException("texld in ps_1_4 not implemented yet");
+						// ps_1_4 texld: dst, src
+						// src is usually a texture coordinate register, dst is a color register
+						// We'll treat it as a 2D texture sample: dst = tex2D(sampler, src)
+						var dst = GetDestinationName(instruction, out var writeMask);
+						var sampler = GetSourceName(instruction, 1); // t#
+						var uv = new SourceOperand { Body = dst, Swizzle = string.Empty, Modifier = "{0}" };
+						WriteLine("{0} = tex2D({1}, {2});", dst, sampler, uv.Body);
 					}
 					else
 					{
-						var uvName = GetDestinationName(instruction, out var writeMask);
-						var uvOperand = new SourceOperand
-						{
-							Body = uvName,
-							Swizzle = string.Empty,
-							Modifier = "{0}"
-						};
-
-						var registerNumber = instruction.GetParamRegisterNumber(0);
-						var samplerDecl = _registers.FindConstant(RegisterSet.Sampler, instruction.GetParamRegisterNumber(0));
-						var samplerName = samplerDecl.GetConstantNameByRegisterNumber(registerNumber, null);
-						var samplerType = samplerDecl.GetRegisterTypeByOffset(registerNumber - samplerDecl.RegisterIndex).Type.ParameterType;
-						var samplerOperand = new SourceOperand
-						{
-							Body = samplerName,
-							Swizzle = string.Empty,
-							Modifier = "{0}",
-							SamplerType = samplerType
-						};
-
-						WriteTextureAssignment(string.Empty, samplerOperand, uvOperand, null);
+						// ps_1_0-1_3: tex dst
+						var dst = GetDestinationName(instruction, out var writeMask);
+						WriteLine("// tex {0}; // Texture sample, implicit texcoord and sampler", dst);
 					}
 					break;
 				case Opcode.TexLDL:
@@ -533,6 +525,36 @@ namespace DXDecompiler.DX9Shader
 					break;
 				case Opcode.Lit:
 					WriteAssignment("lit({0}.x, {0}.y, {0}.w)", GetSourceName(instruction, 1));
+					break;
+				case Opcode.TexReg2AR:
+					// TexReg2AR: Sample texture using .a and .r components of the input register as texture coordinates
+					// Example: dest = tex2D(sampler, float2(src.a, src.r));
+					{
+						string writeMask;
+						WriteLine("{0} = tex2D({1}, float2({2}.a, {2}.r));",
+							GetDestinationName(instruction, out writeMask),
+							GetSourceName(instruction, 1), // sampler
+							GetSourceName(instruction, 0)); // input register
+					}
+					break;
+				case Opcode.TexReg2GB:
+					// TexReg2GB: Sample texture using .g and .b components of the input register as texture coordinates
+					// Example: dest = tex2D(sampler, float2(src.g, src.b));
+					{
+						string writeMask;
+						WriteLine("{0} = tex2D({1}, float2({2}.g, {2}.b));",
+							GetDestinationName(instruction, out writeMask),
+							GetSourceName(instruction, 1), // sampler
+							GetSourceName(instruction, 0)); // input register
+					}
+					break;
+				case Opcode.TexCoord:
+					// TexCoord: Used to declare texture coordinate input registers in assembly. Output as a comment.
+					WriteLine("// texcoord");
+					break;
+				case Opcode.ExpP:
+					// ExpP: Partial-precision exponential base 2. Output as exp2 for HLSL.
+					WriteAssignment("exp2({0})", GetSourceName(instruction, 1));
 					break;
 				default:
 					throw new NotImplementedException(instruction.Opcode.ToString());

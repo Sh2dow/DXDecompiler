@@ -136,12 +136,20 @@ namespace DXDecompiler.DX9Shader
 
 		public RegisterType GetParamRegisterType(int index)
 		{
+			if(index < 0 || index >= Data.Length)
+			{
+				throw new IndexOutOfRangeException($"GetParamRegisterType: index {index} out of range for Data.Length {Data.Length} (Opcode: {Opcode}, Operands: {Operands?.Count})");
+			}
 			uint p = Data[index];
 			return (RegisterType)(((p >> 28) & 0x7) | ((p >> 8) & 0x18));
 		}
 
 		public uint GetParamRegisterNumber(int index)
 		{
+			if(index < 0 || index >= Data.Length)
+			{
+				throw new IndexOutOfRangeException($"GetParamRegisterNumber: index {index} out of range for Data.Length {Data.Length} (Opcode: {Opcode}, Operands: {Operands?.Count})");
+			}
 			return Data[index] & 0x7FF;
 		}
 

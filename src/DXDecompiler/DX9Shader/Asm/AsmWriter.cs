@@ -1,5 +1,4 @@
-﻿using DXDecompiler.DX9Shader.Asm;
-using DXDecompiler.DX9Shader.Bytecode.Ctab;
+﻿using DXDecompiler.DX9Shader.Bytecode.Ctab;
 using DXDecompiler.DX9Shader.Decompiler;
 using System;
 using System.IO;
@@ -9,10 +8,10 @@ namespace DXDecompiler.DX9Shader
 {
 	public class AsmWriter : DecompileWriter
 	{
-		ShaderModel shader;
+		ShaderModel _shader;
 		public AsmWriter(ShaderModel shader)
 		{
-			this.shader = shader;
+			this._shader = shader;
 		}
 
 		public static string Disassemble(byte[] bytecode)
@@ -65,7 +64,8 @@ namespace DXDecompiler.DX9Shader
 				case SourceModifier.SignAndNegate:
 					return $"-{value}_bx2";
 				case SourceModifier.Complement:
-					throw new NotImplementedException();
+					// Complement: 1 - value
+					return $"1 - {value}";
 				case SourceModifier.X2:
 					return $"{value}_x2";
 				case SourceModifier.X2AndNegate:
@@ -79,7 +79,8 @@ namespace DXDecompiler.DX9Shader
 				case SourceModifier.AbsAndNegate:
 					return $"-{value}_abs";
 				case SourceModifier.Not:
-					throw new NotImplementedException();
+					// Not: bitwise not, not directly supported in HLSL, but for bool/int: ~value
+					return $"~{value}";
 				default:
 					throw new NotImplementedException();
 			}
@@ -146,7 +147,7 @@ namespace DXDecompiler.DX9Shader
 		public string Version()
 		{
 			string minor;
-			switch(shader.MinorVersion)
+			switch(_shader.MinorVersion)
 			{
 				case 0:
 					minor = "0";
@@ -158,39 +159,39 @@ namespace DXDecompiler.DX9Shader
 					minor = "x";
 					break;
 			}
-			if(shader.Type == ShaderType.Vertex)
+			if(_shader.Type == ShaderType.Vertex)
 			{
-				return $"vs_{shader.MajorVersion}_{minor}";
+				return $"vs_{_shader.MajorVersion}_{minor}";
 			}
-			else if(shader.Type == ShaderType.Pixel)
+			else if(_shader.Type == ShaderType.Pixel)
 			{
-				return $"ps_{shader.MajorVersion}_{minor}";
+				return $"ps_{_shader.MajorVersion}_{minor}";
 			}
-			else if(shader.Type == ShaderType.Effect)
+			else if(_shader.Type == ShaderType.Effect)
 			{
-				return $"fx_{shader.MajorVersion}_{minor}";
+				return $"fx_{_shader.MajorVersion}_{minor}";
 			}
-			else if(shader.Type == ShaderType.Lib4Vertex)
+			else if(_shader.Type == ShaderType.Lib4Vertex)
 			{
-				return $"lib_4_0_vs_{shader.MajorVersion}_{minor}";
+				return $"lib_4_0_vs_{_shader.MajorVersion}_{minor}";
 			}
-			else if(shader.Type == ShaderType.Lib4Pixel)
+			else if(_shader.Type == ShaderType.Lib4Pixel)
 			{
-				return $"lib_4_0_ps_{shader.MajorVersion}_{minor}";
+				return $"lib_4_0_ps_{_shader.MajorVersion}_{minor}";
 			}
 			else
 			{
-				return $"{shader.Type}_{shader.MajorVersion}_{minor}";
+				return $"{_shader.Type}_{_shader.MajorVersion}_{minor}";
 			}
 		}
 		protected override void Write()
 		{
 			WritePreshader();
-			WriteConstantTable(shader.ConstantTable);
+			WriteConstantTable(_shader.ConstantTable);
 			Indent++;
 			WriteIndent();
 			WriteLine("{0}", Version());
-			foreach(Token token in shader.Tokens)
+			foreach(Token token in _shader.Tokens)
 			{
 				if(token is InstructionToken instruction)
 				{
@@ -226,9 +227,9 @@ namespace DXDecompiler.DX9Shader
 			foreach(var declaration in constantTable.ConstantDeclarations
 					.OrderBy(cd => (int)cd.RegisterSet * 1000 + cd.RegisterIndex))
 			{
-				var size = declaration.Rows * declaration.Columns / 4;
-				if(size == 0) size = 1;
-				size = declaration.RegisterCount;
+				// var size = declaration.Rows * declaration.Columns / 4;
+				// if(size == 0) size = 1; // Removed redundant assignment
+				var size = declaration.RegisterCount;
 				WriteLine(string.Format("//   {0} {1,-5} {2,4}",
 					declaration.Name.PadRight(maxNameLength, ' '),
 					declaration.GetRegisterName(),
@@ -239,14 +240,14 @@ namespace DXDecompiler.DX9Shader
 		}
 		public void WritePreshader()
 		{
-			if(shader.Preshader == null) return;
-			WriteConstantTable(shader.Preshader.Shader.ConstantTable);
-			var preshader = PreshaderAsmWriter.Disassemble(shader.Preshader.Shader);
+			if(_shader.Preshader == null) return;
+			WriteConstantTable(_shader.Preshader.Shader.ConstantTable);
+			var preshader = PreshaderAsmWriter.Disassemble(_shader.Preshader.Shader);
 			Write(preshader);
 		}
 		public void WriteStatistics()
 		{
-			var instructions = shader.Tokens
+			var instructions = _shader.Tokens
 				.ToArray();
 			int instructionCount = 0;
 			int arithmeticCount = 0;
@@ -284,7 +285,7 @@ namespace DXDecompiler.DX9Shader
 		{
 			if(registerType == RegisterType.MiscType) return false;
 			if(registerType == RegisterType.Addr) return false;
-			if(shader.Type == ShaderType.Vertex)
+			if(_shader.Type == ShaderType.Vertex)
 			{
 				return true;
 			}
@@ -519,7 +520,7 @@ namespace DXDecompiler.DX9Shader
 						GetSourceName(instruction, 1), GetSourceName(instruction, 2));
 					break;
 				case Opcode.SinCos:
-					if(shader.MajorVersion >= 3)
+					if(_shader.MajorVersion >= 3)
 					{
 						WriteLine("sincos {0}, {1}", GetDestinationName(instruction),
 							GetSourceName(instruction, 1));
@@ -536,10 +537,19 @@ namespace DXDecompiler.DX9Shader
 						GetSourceName(instruction, 1), GetSourceName(instruction, 2));
 					break;
 				case Opcode.Tex:
-					if((shader.MajorVersion == 1 && shader.MinorVersion >= 4) || (shader.MajorVersion > 1))
+					if((_shader.MajorVersion == 1 && _shader.MinorVersion >= 4) || (_shader.MajorVersion > 1))
 					{
-						WriteLine("texld{0} {1}, {2}, {3}", GetInstructionModifier(instruction), GetDestinationName(instruction),
-							GetSourceName(instruction, 1), GetSourceName(instruction, 2));
+						// For ps_1_4+ and later, texld dst, src, sampler
+						// But for ps_1_0-1_3, tex dst
+						if(instruction.Data.Length == 3) // texld dst, src, sampler
+						{
+							WriteLine("texld{0} {1}, {2}, {3}", GetInstructionModifier(instruction), GetDestinationName(instruction),
+								GetSourceName(instruction, 1), GetSourceName(instruction, 2));
+						}
+						else // tex dst, src
+						{
+							WriteLine("tex{0} {1}, {2}", GetInstructionModifier(instruction), GetDestinationName(instruction), GetSourceName(instruction, 1));
+						}
 					}
 					else
 					{
@@ -628,8 +638,28 @@ namespace DXDecompiler.DX9Shader
 				case Opcode.Label:
 					WriteLine("label {0}", GetSourceName(instruction, 0));
 					break;
+				case Opcode.TexReg2AR:
+					WriteLine("texreg2ar{0} {1}, {2}",
+						GetInstructionModifier(instruction),
+						GetDestinationName(instruction),
+						GetSourceName(instruction, 1));
+					break;
+				case Opcode.TexReg2GB:
+					WriteLine("texreg2gb{0} {1}, {2}",
+						GetInstructionModifier(instruction),
+						GetDestinationName(instruction),
+						GetSourceName(instruction, 1));
+					break;
 				case Opcode.Comment:
 				case Opcode.End:
+					break;
+				case Opcode.Phase:
+					// Phase: Used in ps_2_x and ps_3_0 to separate shader phases. No output needed in assembly.
+					WriteLine("phase");
+					break;
+				case Opcode.TexCoord:
+					// TexCoord: Used to declare texture coordinate input registers in assembly. Output as a comment.
+					WriteLine("texcoord");
 					break;
 				default:
 					WriteLine(instruction.Opcode.ToString());

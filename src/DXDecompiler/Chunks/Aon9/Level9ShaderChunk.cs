@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
+using DXDecompiler.DX9Shader;
 
 namespace DXDecompiler.Chunks.Aon9
 {
@@ -177,7 +178,7 @@ namespace DXDecompiler.Chunks.Aon9
 			sb.AppendLine($"//");
 			using(var stream = new MemoryStream())
 			{
-				var decompiledAssmembly = DX9Shader.AsmWriter.Disassemble(ShaderModel);
+				var decompiledAssmembly = AsmWriter.Disassemble(ShaderModel);
 				decompiledAssmembly = decompiledAssmembly
 					.Replace("ps_2_1", "ps_2_x")
 					.Replace("vs_2_1", "vs_2_x");

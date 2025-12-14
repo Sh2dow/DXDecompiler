@@ -2,12 +2,13 @@
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
-    <TargetFramework>net5.0</TargetFramework>
+    <TargetFramework>net9.0</TargetFramework>
     <AutoGenerateBindingRedirects>true</AutoGenerateBindingRedirects>
     <AssemblyTitle>DXDecompilerCmd</AssemblyTitle>
     <Product>DXDecompilerCmd</Product>
     <Copyright>Copyright ©  2020</Copyright>
     <OutputPath>bin\$(Configuration)\</OutputPath>
+    <LangVersion>default</LangVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugType>full</DebugType>
