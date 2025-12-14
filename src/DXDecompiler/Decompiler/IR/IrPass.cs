@@ -1,8 +1,5 @@
-﻿using DXDecompiler.Chunks.Libf;
-using DXDecompiler.Chunks.Shex;
-using DXDecompiler.Chunks.Shex.Tokens;
+﻿using DXDecompiler.Chunks.Shex.Tokens;
 using System.Collections.Generic;
-using System.Linq;
 
 namespace DXDecompiler.Decompiler.IR
 {

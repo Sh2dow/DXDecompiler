@@ -1,5 +1,4 @@
 ﻿using DXDecompiler.Chunks;
-using DXDecompiler.Chunks.Shex;
 using DXDecompiler.Decompiler.IR;
 
 namespace DXDecompiler.Decompiler.Writer

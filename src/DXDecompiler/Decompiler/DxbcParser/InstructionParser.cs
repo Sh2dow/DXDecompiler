@@ -2,10 +2,8 @@
 using DXDecompiler.Chunks.Shex.Tokens;
 using DXDecompiler.Decompiler.IR;
 using DXDecompiler.Decompiler.IR.Operands;
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace DXDecompiler.Decompiler.DxbcParser
 {

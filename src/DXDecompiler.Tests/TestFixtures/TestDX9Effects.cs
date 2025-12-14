@@ -2,11 +2,7 @@
 using DXDecompiler.DX9Shader.Bytecode.Ctab;
 using NUnit.Framework;
 using SharpDX.D3DCompiler;
-using System;
-using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace DXDecompiler.Tests
 {

@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text;
-using DXDecompiler.DX9Shader;
+using DXDecompiler.DX9Shader.Asm;
 
 namespace DXDecompiler.Chunks.Aon9
 {

@@ -1,5 +1,4 @@
-﻿using DXDecompiler.Chunks.Common;
-using DXDecompiler.Chunks.Rdef;
+﻿using DXDecompiler.Chunks.Rdef;
 using System;
 
 namespace DXDecompiler.Decompiler.IR.ResourceDefinitions

@@ -4,7 +4,7 @@ using DXDecompiler.Util;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using DXDecompiler.DX9Shader;
+using DXDecompiler.DX9Shader.Asm;
 
 namespace DXDecompiler.DX9Shader
 {

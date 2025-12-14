@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-
-namespace DXDecompiler.Decompiler.IR.Operands
+﻿namespace DXDecompiler.Decompiler.IR.Operands
 {
 	public class IrResourceOperand : IrOperand
 	{

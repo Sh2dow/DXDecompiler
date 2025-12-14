@@ -8,7 +8,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using DXDecompiler.DX9Shader;
+using DXDecompiler.DX9Shader.Asm;
 
 namespace DXDecompilerCmd
 {
@@ -136,7 +136,7 @@ namespace DXDecompilerCmd
 			// create disassembly
 			StreamWriter outFile = File.CreateText(shaderPath);
 			// write inputs
-			DXDecompiler.DX9Shader.AsmWriter shaderDisassembler = new DXDecompiler.DX9Shader.AsmWriter(shader);
+			AsmWriter shaderDisassembler = new AsmWriter(shader);
 			shaderDisassembler.SetStream(outFile);
 			shaderDisassembler.WriteConstantTable(shader.ConstantTable);
 			outFile.WriteLine(shaderDisassembler.Version());
@@ -497,7 +497,7 @@ namespace DXDecompilerCmd
 					string baseFileName = Path.GetFileNameWithoutExtension(options.SourcePath);
 					if(options.Mode == DecompileMode.Dissassemble)
 					{
-						var disasm = DXDecompiler.DX9Shader.AsmWriter.Disassemble(data);
+						var disasm = AsmWriter.Disassemble(data);
 						sw.Write(disasm);
 					}
 					else if(options.Mode == DecompileMode.DumpAssembly)

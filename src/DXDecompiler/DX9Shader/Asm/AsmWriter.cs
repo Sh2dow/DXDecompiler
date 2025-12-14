@@ -1,10 +1,10 @@
-﻿using DXDecompiler.DX9Shader.Bytecode.Ctab;
-using DXDecompiler.DX9Shader.Decompiler;
-using System;
+﻿using System;
 using System.IO;
 using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode.Ctab;
+using DXDecompiler.DX9Shader.Decompiler;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Asm
 {
 	public class AsmWriter : DecompileWriter
 	{

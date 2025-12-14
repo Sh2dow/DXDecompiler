@@ -1,8 +1,4 @@
-﻿using DXDecompiler.Chunks.Shex;
-using DXDecompiler.Util;
-using NUnit.Framework;
-using System;
-using System.IO;
+﻿using NUnit.Framework;
 
 namespace DXDecompiler.Tests.Util
 {
