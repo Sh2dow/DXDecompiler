@@ -1,39 +1,93 @@
 name: build
 
+permissions:
+  contents: write
+
 on:
   push:
     branches: [ master ]
+    tags:
+      - 'v*'
   pull_request:
     branches: [ master ]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.2.3)'
+        required: false
+      prerelease:
+        description: 'Mark as prerelease'
+        type: boolean
+        default: false
 
 jobs:
   build:
-
     runs-on: windows-latest
-    defaults:
-      run:
-        working-directory: ./src
+
     steps:
-    - uses: actions/checkout@v2
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: 5.0.x
-    - name: Restore previous dependencies
-      uses: actions/cache@v2
-      with:
-        path: ~/.nuget/packages
-        key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
-    - name: Restore dependencies
-      run: dotnet restore DXDecompiler.sln
-    - name: Build
-      id: build
-      run: dotnet build --no-restore
-    - name: Publish
-      id: publish
-      run: dotnet publish DXDecompilerCmd --no-build
-    - name: Upload published files
-      uses: actions/upload-artifact@v2.3.1
-      with:
-        path: src/DXDecompilerCmd/bin/**/publish
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 9.0.x
+
+      - name: Restore NuGet cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore dependencies
+        run: dotnet restore src/DXDecompiler.sln
+
+      - name: Build
+        run: dotnet build src/DXDecompiler.sln -c Release --no-restore
+
+      - name: Publish
+        run: dotnet publish src/DXDecompilerCmd -c Release --no-build
+
+      - name: Zip publish output
+        run: |
+          $tag = "${{ inputs.tag || github.ref_name }}"
+          Compress-Archive `
+            -Path src/DXDecompilerCmd/bin/Release/**/publish/* `
+            -DestinationPath DXDecompilerCmd-$tag.zip
+
+      - name: Upload published files
+        uses: actions/upload-artifact@v4
+        with:
+          name: DXDecompilerCmd
+          path: src/DXDecompilerCmd/bin/Release/**/publish
+
+      - name: Ensure tag exists (if not, create it)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tag }}
+        shell: pwsh
+        run: |
+          $tag = "${{ inputs.tag }}"
+          if (-not $tag) {
+            Write-Error 'No tag provided.'
+            exit 1
+          }
+          $existing = git tag --list $tag
+          if (-not $existing) {
+            git config user.name "github-actions"
+            git config user.email "github-actions@github.com"
+            git tag $tag
+            git push origin $tag
+            Write-Host "Created and pushed tag $tag."
+          } else {
+            Write-Host "Tag $tag already exists."
+          }
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+          name: DXDecompiler ${{ inputs.tag || github.ref_name }}
+          prerelease: ${{ inputs.prerelease }}
+          files: DXDecompilerCmd-${{ inputs.tag || github.ref_name }}.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
