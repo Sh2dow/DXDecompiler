@@ -384,6 +384,11 @@ namespace DXDecompiler.DX9Shader.Asm
 						GetInstructionModifier(instruction), GetDestinationName(instruction),
 						GetSourceName(instruction, 1), GetSourceName(instruction, 2), GetSourceName(instruction, 3));
 					break;
+				case Opcode.Cnd:
+					WriteLine("cnd{0} {1}, {2}, {3}, {4}",
+						GetInstructionModifier(instruction), GetDestinationName(instruction),
+						GetSourceName(instruction, 1), GetSourceName(instruction, 2), GetSourceName(instruction, 3));
+					break;
 				case Opcode.Dcl:
 					string dclInstruction = "dcl";
 					var registerType = instruction.GetParamRegisterType(1);

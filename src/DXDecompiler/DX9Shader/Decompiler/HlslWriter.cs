@@ -339,6 +339,11 @@ namespace DXDecompiler.DX9Shader
 					WriteAssignment("({0} >= 0) ? {1} : {2}",
 						GetSourceName(instruction, 1), GetSourceName(instruction, 2), GetSourceName(instruction, 3));
 					break;
+				case Opcode.Cnd:
+					// CND: if src0 >= 0 then dest = src1 else dest = src2
+					WriteAssignment("({0} >= 0) ? {1} : {2}",
+						GetSourceName(instruction, 1), GetSourceName(instruction, 2), GetSourceName(instruction, 3));
+					break;
 				case Opcode.DP2Add:
 					WriteAssignment("dot({0}, {1}) + {2}",
 						GetSourceName(instruction, 1), GetSourceName(instruction, 2), GetSourceName(instruction, 3));
