@@ -1,4 +1,4 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿namespace DXDecompiler.DX9Shader.Bytecode
 {
 	// D3DSAMPLER_TEXTURE_TYPE
 	public enum SamplerTextureType

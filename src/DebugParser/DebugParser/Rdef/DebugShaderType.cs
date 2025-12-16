@@ -50,7 +50,7 @@ namespace DXDecompiler.DebugParser.Rdef
 				if(subTypeOffset != 0)
 				{
 					var parentInterfaceReader = reader.CopyAtOffset("subtypeReader", typeReader, (int)subTypeOffset);
-					result.SubType = DebugShaderType.Parse(reader, parentInterfaceReader, target,
+					result.SubType = Parse(reader, parentInterfaceReader, target,
 						indent + 4, true, parentOffset);
 				}
 
@@ -58,7 +58,7 @@ namespace DXDecompiler.DebugParser.Rdef
 				if(baseClassOffset != 0)
 				{
 					var baseClassReader = reader.CopyAtOffset("baseClassReader", typeReader, (int)baseClassOffset);
-					result.BaseClass = DebugShaderType.Parse(reader, baseClassReader, target,
+					result.BaseClass = Parse(reader, baseClassReader, target,
 						indent + 4, true, parentOffset);
 				}
 
@@ -72,7 +72,7 @@ namespace DXDecompiler.DebugParser.Rdef
 					{
 						var interfaceTypeOffset = interfaceSectionReader.ReadUInt32($"UnkInterface{i}");
 						var interfaceReader = reader.CopyAtOffset($"InterfaceReader {i}", typeReader, (int)interfaceTypeOffset);
-						result.Interfaces.Add(DebugShaderType.Parse(reader, interfaceReader,
+						result.Interfaces.Add(Parse(reader, interfaceReader,
 							target, indent + 4, i == 0, parentOffset));
 					}
 				}

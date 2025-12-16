@@ -11,5 +11,6 @@
 		public bool Verbose;
 		public bool DisableCleanup;
 		public bool IgnorePreshaders;
+		public bool UseAst = true; // Use abstract syntax tree by default
 	}
 }

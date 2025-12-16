@@ -1,5 +1,6 @@
 ﻿using DXDecompiler.DebugParser.DX9;
 using DXDecompiler.DX9Shader;
+using DXDecompiler.DX9Shader.Bytecode;
 
 namespace DXDecompiler.DebugParser.FX9
 {

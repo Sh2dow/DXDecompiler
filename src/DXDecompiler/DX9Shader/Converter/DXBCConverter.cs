@@ -1,4 +1,6 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿using DXDecompiler.DX9Shader.Bytecode;
+
+namespace DXDecompiler.DX9Shader.Converter
 {
 	public class DXBCConverter
 	{

@@ -1,6 +1,7 @@
 ﻿using System;
+using DXDecompiler.DX9Shader.Bytecode;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler
 {
 	// https://msdn.microsoft.com/en-us/library/windows/hardware/ff549176(v=vs.85).aspx
 	public class RegisterDeclaration

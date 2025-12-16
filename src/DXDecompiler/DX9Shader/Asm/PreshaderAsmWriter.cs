@@ -1,4 +1,5 @@
 ﻿using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode;
 using DXDecompiler.DX9Shader.Bytecode.Fxlvm;
 
 namespace DXDecompiler.DX9Shader.Asm

@@ -1,4 +1,4 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿namespace DXDecompiler.DX9Shader.Bytecode
 {
 	/// <summary>
 	/// D3DSHADER_PARAM_REGISTER_TYPE d3d9types.h

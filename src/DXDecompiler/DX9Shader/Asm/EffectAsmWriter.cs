@@ -8,12 +8,12 @@ namespace DXDecompiler.DX9Shader.Asm
 {
 	public class EffectAsmWriter : DecompileWriter
 	{
-		FX9.EffectContainer EffectChunk;
-		public EffectAsmWriter(FX9.EffectContainer effectChunk)
+		EffectContainer EffectChunk;
+		public EffectAsmWriter(EffectContainer effectChunk)
 		{
 			EffectChunk = effectChunk;
 		}
-		public static string Disassemble(FX9.EffectContainer effectChunk)
+		public static string Disassemble(EffectContainer effectChunk)
 		{
 			var asmWriter = new EffectAsmWriter(effectChunk);
 			return asmWriter.Decompile();

@@ -1,4 +1,5 @@
-﻿using DXDecompiler.Util;
+﻿using DXDecompiler.DX9Shader.Bytecode;
+using DXDecompiler.Util;
 
 namespace DXDecompiler.DX9Shader.FX9
 {

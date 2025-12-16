@@ -1,6 +1,6 @@
 ﻿using System;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Bytecode
 {
 	// D3DXSHADER
 	[Flags]

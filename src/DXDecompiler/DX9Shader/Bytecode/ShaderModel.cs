@@ -1,13 +1,12 @@
-﻿using DXDecompiler.DX9Shader.Bytecode;
+﻿using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using DXDecompiler.DX9Shader.Bytecode.Ctab;
 using DXDecompiler.DX9Shader.Bytecode.Fxlvm;
 using DXDecompiler.DX9Shader.FX9;
 using DXDecompiler.Util;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Bytecode
 {
 
 	public enum ShaderType

@@ -1,9 +1,9 @@
-﻿using DXDecompiler.Util;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Text;
+using DXDecompiler.Util;
 
-namespace DXDecompiler.Chunks.Fx10
+namespace DXDecompiler.Chunks.Fx10.Assignemnt
 {
 	public class EffectInlineShader5Assignment : EffectAssignment
 	{

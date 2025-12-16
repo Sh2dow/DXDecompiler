@@ -3,6 +3,7 @@ using DXDecompiler.Util;
 using System;
 using System.Collections.Generic;
 using System.Text;
+using DXDecompiler.Chunks.Fx10.Assignemnt;
 
 namespace DXDecompiler.Chunks.Fx10
 {

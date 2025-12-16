@@ -1,8 +1,11 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode;
+using DXDecompiler.DX9Shader.Decompiler.Compiler;
+using DXDecompiler.DX9Shader.Decompiler.Operations;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler.Compiler
 {
 	public sealed class NodeCompiler
 	{
@@ -19,6 +22,18 @@ namespace DXDecompiler.DX9Shader
 			_nodeGrouper = new NodeGrouper(registers);
 			_constantCompiler = new ConstantCompiler(_nodeGrouper);
 			_matrixMultiplicationCompiler = new MatrixMultiplicationCompiler(this);
+		}
+
+		public bool UseTemporariesForComplexExpressions { get; set; } = false;
+		public Action<string, string> TemporaryAssignmentCallback { get; set; }
+
+		private int _tempVarCounter = 0;
+		private string GetTempVarName(string type = "float4") => $"temp{_tempVarCounter++}";
+
+		private bool IsComplex(string expr)
+		{
+			// Heuristic: consider an expression complex if it contains nested parentheses or is long
+			return expr.Count(c => c == '(') > 1 || expr.Length > 40 || expr.Contains("+") || expr.Contains("*") || expr.Contains("tex2D");
 		}
 
 		public string Compile(IEnumerable<HlslTreeNode> group, int promoteToVectorSize = PromoteToAnyVectorSize)
@@ -82,7 +97,15 @@ namespace DXDecompiler.DX9Shader
 
 			if(first is Operation operation)
 			{
-				return CompileOperation(operation, components, promoteToVectorSize);
+				var expr = CompileOperation(operation, components, promoteToVectorSize);
+				if(UseTemporariesForComplexExpressions && IsComplex(expr) && TemporaryAssignmentCallback != null)
+				{
+					string tempType = $"float{components.Count}";
+					string tempVar = GetTempVarName(tempType);
+					TemporaryAssignmentCallback($"{tempType} {tempVar}", expr);
+					return tempVar;
+				}
+				return expr;
 			}
 
 			if(first is IHasComponentIndex component)
@@ -90,7 +113,18 @@ namespace DXDecompiler.DX9Shader
 				return CompileNodesWithComponents(components, first, promoteToVectorSize);
 			}
 
-			throw new NotImplementedException();
+			// Fallback: output as function call with all inputs
+			var typeName = first.GetType().Name.Replace("Operation", "").ToLowerInvariant();
+			var args = string.Join(", ", first.Inputs.Select(x => Compile(new List<HlslTreeNode> { x })));
+			var fallbackExpr = $"{typeName}({args})";
+			if(UseTemporariesForComplexExpressions && IsComplex(fallbackExpr) && TemporaryAssignmentCallback != null)
+			{
+				string tempType = $"float{components.Count}";
+				string tempVar = GetTempVarName(tempType);
+				TemporaryAssignmentCallback($"{tempType} {tempVar}", fallbackExpr);
+				return tempVar;
+			}
+			return fallbackExpr;
 		}
 
 		private string CompileVectorConstructor(List<HlslTreeNode> components, IList<IList<HlslTreeNode>> componentGroups)
@@ -237,8 +271,33 @@ namespace DXDecompiler.DX9Shader
 
 						return $"{value1} >= 0 ? {value2} : {value3}";
 					}
+
+				case LitOperation _:
+					{
+						string value = Compile(components.Select(g => g.Inputs[0]));
+						return $"lit({value})";
+					}
+				case ExpPOperation _:
+					{
+						string value = Compile(components.Select(g => g.Inputs[0]));
+						return $"exp2({value})";
+					}
+				case ExpOperation _:
+					{
+						string value = Compile(components.Select(g => g.Inputs[0]));
+						return $"exp({value})";
+					}
+				case TexKillOperation _:
+					{
+						string value = Compile(components.Select(g => g.Inputs[0]));
+						return $"clip({value})";
+					}
 				default:
-					throw new NotImplementedException();
+					{
+						// Fallback: output as function call with all inputs
+						var args = string.Join(", ", components.SelectMany(g => g.Inputs).Select(x => Compile(new[] { x })));
+						return $"{operation.Mnemonic}({args})";
+					}
 			}
 		}
 
@@ -258,8 +317,19 @@ namespace DXDecompiler.DX9Shader
 						promoteToVectorSize);
 				}
 
-				string name = _registers.GetRegisterName(registerKey);
-				return $"{name}{swizzle}";
+				string name;
+				if(registerKey.Type == RegisterType.Const)
+				{
+					// Use registerKey.ToString() for constants in AST path
+					string constSwizzle = swizzle;
+					name = registerKey.ToString();
+					return $"{name}{constSwizzle}";
+				}
+				else
+				{
+					name = _registers.GetRegisterName(registerKey);
+					return $"{name}{swizzle}";
+				}
 			}
 
 			if(first is TextureLoadOutputNode textureLoad)

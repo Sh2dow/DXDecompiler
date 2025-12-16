@@ -128,7 +128,7 @@ namespace DXDecompiler.DebugParser.Chunks.Fx10
 					{
 						var interfaceOffset = typeReader.ReadUInt32($"InterfaceOffset{i}");
 						var interfaceReader = reader.CopyAtOffset($"Interface{i}", typeReader, (int)interfaceOffset);
-						result.InterfaceTypes.Add(DebugEffectType.Parse(reader, interfaceReader, version));
+						result.InterfaceTypes.Add(Parse(reader, interfaceReader, version));
 					}
 				}
 			}

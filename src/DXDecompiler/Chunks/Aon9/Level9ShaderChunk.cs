@@ -6,12 +6,13 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using DXDecompiler.DX9Shader.Asm;
+using DXDecompiler.DX9Shader.Bytecode;
 
 namespace DXDecompiler.Chunks.Aon9
 {
 	public class Level9ShaderChunk : BytecodeChunk
 	{
-		public DX9Shader.ShaderModel ShaderModel { get; private set; }
+		public ShaderModel ShaderModel { get; private set; }
 		public List<ConstantBufferMapping> ConstantBufferMappings { get; private set; }
 		public List<LoopRegisterMapping> LoopRegisterMappings { get; private set; }
 		public List<Unknown1Mapping> Unknown0Mappings { get; private set; }
@@ -91,7 +92,7 @@ namespace DXDecompiler.Chunks.Aon9
 			}
 			var shaderChunkReader = chunkContentReader.CopyAtOffset((int)shaderOffset);
 			var byteCode = shaderChunkReader.ReadBytes((int)shaderSize);
-			result.ShaderModel = DX9Shader.ShaderReader.ReadShader(byteCode);
+			result.ShaderModel = ShaderReader.ReadShader(byteCode);
 			return result;
 		}
 		public override string ToString()

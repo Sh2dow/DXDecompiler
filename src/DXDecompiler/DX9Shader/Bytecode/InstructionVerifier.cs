@@ -1,10 +1,10 @@
 ﻿using System.Diagnostics;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Bytecode
 {
 	public class InstructionVerifier
 	{
-		[System.Diagnostics.Conditional("DEBUG")]
+		[Conditional("DEBUG")]
 		public static void Verify(InstructionToken instruction)
 		{
 			//Assert(currentInstruction.Modifier == 0);

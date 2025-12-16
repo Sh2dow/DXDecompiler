@@ -3,6 +3,7 @@ using DXDecompiler.Util;
 using NUnit.Framework;
 using System;
 using System.IO;
+using DXDecompiler.DX9Shader.Bytecode;
 
 namespace DXDecompiler.Tests.Util
 {
@@ -25,7 +26,7 @@ namespace DXDecompiler.Tests.Util
 		public void TestEnums()
 		{
 			string text = "";
-			foreach(var _enum in Enum.GetValues(typeof(DX9Shader.Opcode)))
+			foreach(var _enum in Enum.GetValues(typeof(Opcode)))
 			{
 				int val = (int)_enum;
 				text += $"{_enum} = 0x{val.ToString("X")}\n";

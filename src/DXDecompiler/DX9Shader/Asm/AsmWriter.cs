@@ -1,8 +1,10 @@
 ﻿using System;
 using System.IO;
 using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode;
 using DXDecompiler.DX9Shader.Bytecode.Ctab;
 using DXDecompiler.DX9Shader.Decompiler;
+using DXDecompiler.DX9Shader.Decompiler.Util;
 
 namespace DXDecompiler.DX9Shader.Asm
 {
@@ -11,7 +13,7 @@ namespace DXDecompiler.DX9Shader.Asm
 		ShaderModel _shader;
 		public AsmWriter(ShaderModel shader)
 		{
-			this._shader = shader;
+			_shader = shader;
 		}
 
 		public static string Disassemble(byte[] bytecode)
@@ -324,7 +326,7 @@ namespace DXDecompiler.DX9Shader.Asm
 		{
 			if(rawBytes[0] == 0 && rawBytes[1] == 0 && rawBytes[2] == 0 && rawBytes[3] == 128)
 				return "-0"; // "Negative" zero
-			var floatValue = BitConverter.ToSingle(rawBytes, 0);
+			var floatValue = SingleConverter.UIntToFloat(BitConverter.ToUInt32(rawBytes, 0));
 			var result = (floatValue).ToString("R");
 			return result;
 		}

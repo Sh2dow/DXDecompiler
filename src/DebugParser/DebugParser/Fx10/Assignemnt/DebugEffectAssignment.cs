@@ -1,4 +1,5 @@
 ﻿using DXDecompiler.Chunks.Fx10;
+using DXDecompiler.Chunks.Fx10.Assignemnt;
 using DXDecompiler.DebugParser.Chunks.Fx10.Assignemnt;
 
 namespace DXDecompiler.DebugParser.Chunks.Fx10

@@ -1,8 +1,7 @@
-﻿using DXDecompiler.Chunks.Fx10.Assignemnt;
+﻿using System.Text;
 using DXDecompiler.Util;
-using System.Text;
 
-namespace DXDecompiler.Chunks.Fx10
+namespace DXDecompiler.Chunks.Fx10.Assignemnt
 {
 	public class EffectAssignment
 	{

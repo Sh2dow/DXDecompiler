@@ -483,7 +483,7 @@ namespace DXDecompiler.Decompiler
 				var names = string.Join(", ", kv.Value);
 				sb.AppendLine($"// {kv.Key} = {names}");
 			}
-			foreach(var kv in this.ResourceBindings)
+			foreach(var kv in ResourceBindings)
 			{
 				sb.AppendLine($"// RB! {kv.Key} = {kv.Value.Variables[0].ShaderType}");
 			}

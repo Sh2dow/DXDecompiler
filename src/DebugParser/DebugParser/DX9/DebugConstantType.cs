@@ -34,7 +34,7 @@ namespace DebugParser.DebugParser.DX9
 					nameReader.ReadString("Name");
 					var typeOffset = memberInfoReader.ReadUInt32($"Member{i}TypeOffset");
 					var memberTypeReader = reader.CopyAtOffset($"Member{i}TypeReader", memberInfoReader, (int)typeOffset);
-					result.Members.Add(DebugConstantType.Parse(reader, memberTypeReader));
+					result.Members.Add(Parse(reader, memberTypeReader));
 				}
 			}
 			return result;

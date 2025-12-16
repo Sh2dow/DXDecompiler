@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using DXDecompiler.DX9Shader.Decompiler;
+using DXDecompiler.DX9Shader.Decompiler.Util;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Bytecode
 {
 	/// <summary>
 	/// Instruction Token 
@@ -119,7 +121,7 @@ namespace DXDecompiler.DX9Shader
 
 		public float GetParamSingle(int index)
 		{
-			return BitConverter.ToSingle(GetParamBytes(index), 0);
+			return SingleConverter.UIntToFloat(Data[index]);
 		}
 
 		public float GetParamInt(int index)
