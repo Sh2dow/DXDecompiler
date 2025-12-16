@@ -1,8 +1,8 @@
-﻿using DXDecompiler.Chunks.Fxlvm;
+﻿using System.Text;
+using DXDecompiler.Chunks.Fxlvm;
 using DXDecompiler.Util;
-using System.Text;
 
-namespace DXDecompiler.Chunks.Fx10
+namespace DXDecompiler.Chunks.Fx10.Assignemnt
 {
 	public class EffectExpressionAssignment : EffectAssignment
 	{

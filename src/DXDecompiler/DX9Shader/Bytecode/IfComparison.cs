@@ -1,6 +1,6 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿namespace DXDecompiler.DX9Shader.Bytecode
 {
-	enum IfComparison
+	public enum IfComparison
 	{
 		None,
 		GT,

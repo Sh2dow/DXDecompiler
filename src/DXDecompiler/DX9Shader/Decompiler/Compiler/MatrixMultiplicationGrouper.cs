@@ -1,9 +1,9 @@
-﻿using DXDecompiler.DX9Shader.Bytecode.Ctab;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode.Ctab;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler.Compiler
 {
 	public class MatrixMultiplicationGrouper
 	{

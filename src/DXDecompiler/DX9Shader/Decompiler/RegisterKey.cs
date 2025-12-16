@@ -1,4 +1,6 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿using DXDecompiler.DX9Shader.Bytecode;
+
+namespace DXDecompiler.DX9Shader.Decompiler
 {
 	public class RegisterKey
 	{
@@ -10,6 +12,13 @@
 
 		public uint Number { get; }
 		public RegisterType Type { get; }
+		public bool IsConstant =>
+            Type == RegisterType.Const ||
+            Type == RegisterType.ConstInt ||
+            Type == RegisterType.Const2 ||
+            Type == RegisterType.Const3 ||
+            Type == RegisterType.Const4 ||
+            Type == RegisterType.ConstBool;
 
 
 		public override bool Equals(object obj)

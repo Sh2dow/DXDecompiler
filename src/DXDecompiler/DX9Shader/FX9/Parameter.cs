@@ -4,6 +4,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using DXDecompiler.DX9Shader.Bytecode;
 
 namespace DXDecompiler.DX9Shader.FX9
 {
@@ -41,7 +42,7 @@ namespace DXDecompiler.DX9Shader.FX9
 				result.StructMemberCount = variableReader.ReadUInt32();
 				for(int i = 0; i < result.StructMemberCount; i++)
 				{
-					result.StructMembers.Add(Parameter.Parse(reader, variableReader));
+					result.StructMembers.Add(Parse(reader, variableReader));
 				}
 			}
 			if(result.ParameterClass == ParameterClass.Object)

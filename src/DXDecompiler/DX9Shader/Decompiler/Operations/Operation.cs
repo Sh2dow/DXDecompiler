@@ -1,6 +1,6 @@
 ﻿using System.Linq;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler.Operations
 {
 	public abstract class Operation : HlslTreeNode
 	{

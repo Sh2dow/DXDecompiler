@@ -1,10 +1,11 @@
-using DXDecompiler.DX9Shader.Bytecode.Ctab;
 using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode;
+using DXDecompiler.DX9Shader.Bytecode.Ctab;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler
 {
 	public sealed class RegisterState
 	{
@@ -324,6 +325,11 @@ namespace DXDecompiler.DX9Shader
 			if(registerKey.Type == RegisterType.Const)
 			{
 				var constant = FindConstant(RegisterSet.Float4, registerKey.Number);
+				if(constant == null)
+				{
+					// Fallback: assume float4 (4 components) if not found in constant table
+					return 4;
+				}
 				var data = constant.GetRegisterTypeByOffset(registerKey.Number - constant.RegisterIndex);
 				if(data.Type.ParameterType != ParameterType.Float)
 				{

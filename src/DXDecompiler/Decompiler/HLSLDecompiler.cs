@@ -24,7 +24,7 @@ namespace DXDecompiler.Decompiler
 		{
 			StringBuilder sb = new StringBuilder();
 			StringWriter sw = new StringWriter(sb);
-			DecompileContext context = new DecompileContext(sw, this.ShaderIR);
+			DecompileContext context = new DecompileContext(sw, ShaderIR);
 			context.Write();
 			return sb.ToString();
 		}

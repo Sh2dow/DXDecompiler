@@ -1,6 +1,7 @@
 ﻿using System;
+using DXDecompiler.DX9Shader.Decompiler.Operations;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler.Compiler
 {
 	public class DotProductGrouper
 	{
@@ -45,26 +46,22 @@ namespace DXDecompiler.DX9Shader
 
 		private DotProductContext TryGetDot4ProductGroup(HlslTreeNode node, bool allowMatrixColumn)
 		{
-			// 4 by 4 dot product has a pattern of:
-			// #1  dot3(abc, xyz) + dw
-			// #2  dw + dot3(abc, xyz)
-
 			if(!(node is AddOperation addition))
 			{
 				return null;
 			}
 
 			MultiplyOperation dw;
-			DotProductContext innerAddition = TryGetDot3ProductGroup(addition.Addend1, allowMatrixColumn);
+			DotProductContext innerAddition = TryGetDot3ProductGroup(addition.Inputs[0], allowMatrixColumn);
 			if(innerAddition == null)
 			{
-				innerAddition = TryGetDot3ProductGroup(addition.Addend2, allowMatrixColumn);
+				innerAddition = TryGetDot3ProductGroup(addition.Inputs[1], allowMatrixColumn);
 				if(innerAddition == null)
 				{
 					return null;
 				}
 
-				dw = addition.Addend1 as MultiplyOperation;
+				dw = addition.Inputs[0] as MultiplyOperation;
 				if(dw == null)
 				{
 					return null;
@@ -72,7 +69,7 @@ namespace DXDecompiler.DX9Shader
 			}
 			else
 			{
-				dw = addition.Addend2 as MultiplyOperation;
+				dw = addition.Inputs[1] as MultiplyOperation;
 				if(dw == null)
 				{
 					return null;
@@ -91,7 +88,6 @@ namespace DXDecompiler.DX9Shader
 			{
 				if(allowMatrixColumn && SharesMatrixColumnOrRow(c, d))
 				{
-					// If one of the arguments is a matrix, allow the other argument to be arbitrary.
 					return new DotProductContext(new[] { a, b, c, d }, new[] { x, y, z, w });
 				}
 				if(CanGroupComponents(z, w, allowMatrixColumn))
@@ -105,26 +101,22 @@ namespace DXDecompiler.DX9Shader
 
 		private DotProductContext TryGetDot3ProductGroup(HlslTreeNode node, bool allowMatrixColumn)
 		{
-			// 3 by 3 dot product has a pattern of:
-			// #1  dot(ab, xy) + c*z
-			// #2  c*z + dot(ab, xy)
-
 			if(!(node is AddOperation addition))
 			{
 				return null;
 			}
 
 			MultiplyOperation cz;
-			DotProductContext innerAddition = TryGetDot2ProductGroup(addition.Addend1, allowMatrixColumn);
+			DotProductContext innerAddition = TryGetDot2ProductGroup(addition.Inputs[0], allowMatrixColumn);
 			if(innerAddition == null)
 			{
-				innerAddition = TryGetDot2ProductGroup(addition.Addend2, allowMatrixColumn);
+				innerAddition = TryGetDot2ProductGroup(addition.Inputs[1], allowMatrixColumn);
 				if(innerAddition == null)
 				{
 					return null;
 				}
 
-				cz = addition.Addend1 as MultiplyOperation;
+				cz = addition.Inputs[0] as MultiplyOperation;
 				if(cz == null)
 				{
 					return null;
@@ -132,7 +124,7 @@ namespace DXDecompiler.DX9Shader
 			}
 			else
 			{
-				cz = addition.Addend2 as MultiplyOperation;
+				cz = addition.Inputs[1] as MultiplyOperation;
 				if(cz == null)
 				{
 					return null;
@@ -149,7 +141,6 @@ namespace DXDecompiler.DX9Shader
 			{
 				if(allowMatrixColumn && SharesMatrixColumnOrRow(a, b))
 				{
-					// If one of the arguments is a matrix, allow the other argument to be arbitrary.
 					return new DotProductContext(new[] { a, b, c }, new[] { x, y, z });
 				}
 				if(CanGroupComponents(y, z, allowMatrixColumn))
@@ -163,12 +154,9 @@ namespace DXDecompiler.DX9Shader
 
 		private DotProductContext TryGetDot2ProductGroup(HlslTreeNode node, bool allowMatrixColumn)
 		{
-			// 2 by 2 dot product has a pattern of:
-			// a*x + b*y
-
 			if(!(node is AddOperation addition) ||
-				!(addition.Addend1 is MultiplyOperation ax) ||
-				!(addition.Addend2 is MultiplyOperation by))
+				!(addition.Inputs[0] is MultiplyOperation ax) ||
+				!(addition.Inputs[1] is MultiplyOperation by))
 			{
 				return null;
 			}
@@ -188,7 +176,6 @@ namespace DXDecompiler.DX9Shader
 				{
 					if(allowMatrixColumn && SharesMatrixColumnOrRow(x, y))
 					{
-						// If one of the arguments is a matrix, allow the other argument to be arbitrary.
 						return new DotProductContext(new[] { a, b }, new[] { x, y });
 					}
 					return null;

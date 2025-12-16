@@ -1,11 +1,11 @@
-﻿using DXDecompiler.DX9Shader.Bytecode.Ctab;
-using DXDecompiler.DX9Shader.Decompiler;
-using DXDecompiler.DX9Shader.FX9;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode;
+using DXDecompiler.DX9Shader.Bytecode.Ctab;
+using DXDecompiler.DX9Shader.FX9;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler
 {
 	public class EffectHLSLWriter : DecompileWriter
 	{
@@ -242,7 +242,7 @@ namespace DXDecompiler.DX9Shader
 			}
 			throw new ArgumentException();
 		}
-		public string VariableBlobToString(FX9.Parameter key, int index = 0)
+		public string VariableBlobToString(Parameter key, int index = 0)
 		{
 			if(!_effectChunk.VariableBlobLookup.ContainsKey(key))
 			{

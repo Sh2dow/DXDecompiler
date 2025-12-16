@@ -50,7 +50,7 @@ namespace DXDecompiler.DebugParser.FX9
 				result.StructMemberCount = variableReader.ReadUInt32("StructMemberCount");
 				for(int i = 0; i < result.StructMemberCount; i++)
 				{
-					result.StructMembers.Add(DebugParameter.Parse(reader, variableReader));
+					result.StructMembers.Add(Parse(reader, variableReader));
 				}
 
 			}

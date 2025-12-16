@@ -1,10 +1,10 @@
-﻿using DXDecompiler.Util;
-using System;
+﻿using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using DXDecompiler.Util;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Bytecode
 {
 	public class ShaderReader : BinaryReader
 	{

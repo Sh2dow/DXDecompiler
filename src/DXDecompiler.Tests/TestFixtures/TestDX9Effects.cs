@@ -3,6 +3,8 @@ using DXDecompiler.DX9Shader.Bytecode.Ctab;
 using NUnit.Framework;
 using SharpDX.D3DCompiler;
 using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode;
+using DXDecompiler.DX9Shader.Decompiler;
 
 namespace DXDecompiler.Tests
 {

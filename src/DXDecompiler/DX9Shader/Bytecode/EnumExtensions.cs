@@ -1,7 +1,7 @@
-﻿using DXDecompiler.DX9Shader.Bytecode.Ctab;
-using System;
+﻿using System;
+using DXDecompiler.DX9Shader.Bytecode.Ctab;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Bytecode
 {
 	public static class EnumExtensions
 	{

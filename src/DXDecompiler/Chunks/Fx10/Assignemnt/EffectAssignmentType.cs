@@ -1,8 +1,7 @@
 ﻿using DXDecompiler.Chunks.Common;
-using DXDecompiler.Chunks.Fx10.Assignemnt;
 using DXDecompiler.Chunks.RTS0;
 
-namespace DXDecompiler.Chunks.Fx10
+namespace DXDecompiler.Chunks.Fx10.Assignemnt
 {
 	public enum EffectAssignmentType
 	{

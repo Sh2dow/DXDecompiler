@@ -1,8 +1,10 @@
-﻿using DXDecompiler.DX9Shader.Bytecode.Ctab;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.Linq;
+using DXDecompiler.DX9Shader.Bytecode.Ctab;
+using DXDecompiler.DX9Shader.Decompiler.Operations;
+using DXDecompiler.DX9Shader.Decompiler.Operations;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler.Compiler
 {
 	public class NodeGrouper
 	{
@@ -260,8 +262,8 @@ namespace DXDecompiler.DX9Shader
 			if(node1 is Operation operation1 &&
 				node2 is Operation operation2)
 			{
-				if(operation1 is AddOperation add1 &&
-					operation2 is AddOperation add2)
+				if(operation1 is DXDecompiler.DX9Shader.Decompiler.Operations.AddOperation add1 &&
+					operation2 is DXDecompiler.DX9Shader.Decompiler.Operations.AddOperation add2)
 				{
 					return (AreNodesEquivalent(add1.Addend1, add2.Addend1) && AreNodesEquivalent(add1.Addend2, add2.Addend2))
 						|| (AreNodesEquivalent(add1.Addend1, add2.Addend2) && AreNodesEquivalent(add1.Addend2, add2.Addend1));

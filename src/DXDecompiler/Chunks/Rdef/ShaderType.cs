@@ -96,7 +96,7 @@ namespace DXDecompiler.Chunks.Rdef
 				if(subTypeOffset != 0)
 				{
 					var parentTypeReader = reader.CopyAtOffset((int)subTypeOffset);
-					result.SubType = ShaderType.Parse(reader, parentTypeReader, target,
+					result.SubType = Parse(reader, parentTypeReader, target,
 						indent + 4, true, parentOffset);
 					Debug.Assert(
 							result.SubType.VariableClass == ShaderVariableClass.Vector ||
@@ -107,7 +107,7 @@ namespace DXDecompiler.Chunks.Rdef
 				if(baseClassOffset != 0)
 				{
 					var baseClassReader = reader.CopyAtOffset((int)baseClassOffset);
-					result.BaseClass = ShaderType.Parse(reader, baseClassReader, target,
+					result.BaseClass = Parse(reader, baseClassReader, target,
 						indent + 4, true, parentOffset);
 					Debug.Assert(
 						result.BaseClass.VariableClass == ShaderVariableClass.Scalar ||
@@ -123,7 +123,7 @@ namespace DXDecompiler.Chunks.Rdef
 					{
 						var interfaceTypeOffset = interfaceSectionReader.ReadUInt32();
 						var interfaceReader = reader.CopyAtOffset((int)interfaceTypeOffset);
-						result.Interfaces.Add(ShaderType.Parse(reader, interfaceReader, target,
+						result.Interfaces.Add(Parse(reader, interfaceReader, target,
 							indent + 4, i == 0, parentOffset));
 					}
 				}

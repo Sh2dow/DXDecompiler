@@ -1,4 +1,4 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿namespace DXDecompiler.DX9Shader.Decompiler.Operations
 {
 	public class SineOperation : UnaryOperation
 	{

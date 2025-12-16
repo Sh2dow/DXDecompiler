@@ -1,6 +1,7 @@
 ﻿using DXDecompiler.Util;
 using System;
 using System.Text;
+using DXDecompiler.DX9Shader.Bytecode;
 
 namespace DXDecompiler.DX9Shader.FX9
 {

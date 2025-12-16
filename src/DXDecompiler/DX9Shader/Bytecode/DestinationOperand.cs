@@ -1,4 +1,4 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿namespace DXDecompiler.DX9Shader.Bytecode
 {
 	/// <summary>
 	/// Destination Parameter Token

@@ -1,4 +1,6 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿using System.Collections.Generic;
+
+namespace DXDecompiler.DX9Shader.Decompiler.Operations
 {
 	public class MultiplyAddOperation : Operation
 	{
@@ -25,6 +27,22 @@
 			Replace(addition);
 
 			return addition.Reduce();
+		}
+		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
+		{
+			if (depth > 32)
+			{
+				return $"/* ERROR: Max recursion depth reached in MultiplyAddOperation */";
+			}
+			if (!visited.Add(this))
+			{
+				return $"/* ERROR: Cycle detected in MultiplyAddOperation */";
+			}
+			string f1 = Factor1?.ToHlsl(visited, depth + 1) ?? "null";
+			string f2 = Factor2?.ToHlsl(visited, depth + 1) ?? "null";
+			string add = Addend?.ToHlsl(visited, depth + 1) ?? "null";
+			visited.Remove(this);
+			return $"({f1} * {f2} + {add})";
 		}
 	}
 }

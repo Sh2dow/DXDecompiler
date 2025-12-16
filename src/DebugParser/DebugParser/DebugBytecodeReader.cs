@@ -253,7 +253,7 @@ namespace DXDecompiler.DebugParser
 			entry.Value = result.ToString();
 			return result;
 		}
-		public T ReadEnum32<T>(string name) where T : System.Enum
+		public T ReadEnum32<T>(string name) where T : Enum
 		{
 			var result = Enum.ToObject(typeof(T), _reader.ReadUInt32());
 			var entry = AddEntry(name, 4);
@@ -262,7 +262,7 @@ namespace DXDecompiler.DebugParser
 			return (T)result;
 		}
 
-		public T ReadEnum16<T>(string name) where T : System.Enum
+		public T ReadEnum16<T>(string name) where T : Enum
 		{
 			var result = Enum.ToObject(typeof(T), _reader.ReadUInt16());
 			var entry = AddEntry(name, 2);
@@ -271,7 +271,7 @@ namespace DXDecompiler.DebugParser
 			return (T)result;
 		}
 
-		public T ReadEnum8<T>(string name) where T : System.Enum
+		public T ReadEnum8<T>(string name) where T : Enum
 		{
 			var result = Enum.ToObject(typeof(T), _reader.ReadByte());
 			var entry = AddEntry(name, 1);

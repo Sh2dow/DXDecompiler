@@ -1,4 +1,6 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿using System.Collections.Generic;
+
+namespace DXDecompiler.DX9Shader.Decompiler.Operations
 {
 	public class NegateOperation : UnaryOperation
 	{
@@ -24,6 +26,20 @@
 				return newValue;
 			}
 			return base.Reduce();
+		}
+		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
+		{
+			if (depth > 32)
+			{
+				return $"/* ERROR: Max recursion depth reached in NegateOperation */";
+			}
+			if (!visited.Add(this))
+			{
+				return $"/* ERROR: Cycle detected in NegateOperation */";
+			}
+			string val = Value?.ToHlsl(visited, depth + 1) ?? "null";
+			visited.Remove(this);
+			return $"(-{val})";
 		}
 	}
 }

@@ -1,4 +1,4 @@
-﻿namespace DXDecompiler.Chunks.Fx10
+﻿namespace DXDecompiler.Chunks.Fx10.Assignemnt
 {
 	public enum EffectCompilerAssignmentType
 	{

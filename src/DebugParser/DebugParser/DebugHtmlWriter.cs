@@ -17,9 +17,9 @@ namespace DXDecompiler.DebugParser
 		private List<IDumpable> Members = new List<IDumpable>();
 		public DebugHtmlWriter(DebugBytecodeReader reader, byte[] buffer, List<IDumpable> members)
 		{
-			this.Reader = reader;
+			Reader = reader;
 			this.buffer = buffer;
-			this.Members = members;
+			Members = members;
 		}
 		public string ToHtml()
 		{

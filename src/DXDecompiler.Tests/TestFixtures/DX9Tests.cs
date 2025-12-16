@@ -10,6 +10,8 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using DXDecompiler.DX9Shader.Asm;
+using DXDecompiler.DX9Shader.Bytecode;
+using DXDecompiler.DX9Shader.Decompiler;
 
 namespace DXDecompiler.Tests
 {

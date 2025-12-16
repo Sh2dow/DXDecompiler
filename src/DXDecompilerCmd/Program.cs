@@ -9,6 +9,8 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using DXDecompiler.DX9Shader.Asm;
+using DXDecompiler.DX9Shader.Bytecode;
+using DXDecompiler.DX9Shader.Decompiler;
 
 namespace DXDecompilerCmd
 {
@@ -26,7 +28,7 @@ namespace DXDecompilerCmd
 
 		public static void AssembleShader(string compiler, string inFile, string outFile, StreamWriter stream)
 		{
-			System.Diagnostics.Process process = new System.Diagnostics.Process();
+			Process process = new Process();
 			process.StartInfo.FileName = compiler;
 			process.StartInfo.Arguments = inFile + " /nologo /Fo " + outFile;
 			process.StartInfo.RedirectStandardOutput = true;
@@ -46,7 +48,7 @@ namespace DXDecompilerCmd
 
 		public static void CompileShaderToAsm(string shaderType, string mainFunctionName, string inFile, string outFile, StreamWriter stream)
 		{
-			System.Diagnostics.Process process = new System.Diagnostics.Process();
+			Process process = new Process();
 			process.StartInfo.FileName = "fxc.exe";
 			process.StartInfo.Arguments = inFile + " /nologo /E" + mainFunctionName + " /T" + shaderType + " /Fc " + outFile;
 			process.StartInfo.RedirectStandardOutput = true;
@@ -103,7 +105,7 @@ namespace DXDecompilerCmd
 			return bytes;
 		}
 
-		public static void SaveShader(string shaderName, DXDecompiler.DX9Shader.ShaderModel shader, Options options, StreamWriter sw)
+		public static void SaveShader(string shaderName, ShaderModel shader, Options options, StreamWriter sw)
 		{
 			if((!options.IgnorePreshaders) && !(shader.Preshader is null))
 			{
@@ -122,10 +124,10 @@ namespace DXDecompilerCmd
 			}
 			string shaderPath = shaderName + ".fxa";
 
-			if(shader.Type == DXDecompiler.DX9Shader.ShaderType.Expression)
+			if(shader.Type == ShaderType.Expression)
 			{
 				int instructionCount = 0;
-				foreach(DXDecompiler.DX9Shader.InstructionToken instruction in shader.Instructions)
+				foreach(InstructionToken instruction in shader.Instructions)
 					++instructionCount;
 				sw.WriteLine(instructionCount);
 				sw.WriteLine(shader.Fxlc.Tokens.Count);
@@ -141,7 +143,7 @@ namespace DXDecompilerCmd
 			shaderDisassembler.WriteConstantTable(shader.ConstantTable);
 			outFile.WriteLine(shaderDisassembler.Version());
 			List<byte> instructionBytes = new List<byte>();
-			foreach(DXDecompiler.DX9Shader.InstructionToken instruction in shader.Instructions)
+			foreach(InstructionToken instruction in shader.Instructions)
 			{
 				// used for error-checking later
 				foreach(byte b in BitConverter.GetBytes(instruction.Instruction))
@@ -160,7 +162,7 @@ namespace DXDecompilerCmd
 			var preshader = shader.Preshader;
 			if(options.IgnorePreshaders)
 				shader.Preshader = null;
-			string decompiledHlsl = DXDecompiler.DX9Shader.HlslWriter.Decompile(shader, null, null, true);
+			string decompiledHlsl = HlslWriter.Decompile(shader, null, null, true, true, options.Verbose);
 			string finalHlsl = "";
 			if(!options.AddComments)
 			{
@@ -207,7 +209,7 @@ namespace DXDecompilerCmd
 			StreamWriter logger = options.Verbose ? sw : null;
 
 			// check assembly
-			string compiler = shader.Type == DXDecompiler.DX9Shader.ShaderType.Pixel ? "psa.exe" : "vsa.exe";
+			string compiler = shader.Type == ShaderType.Pixel ? "psa.exe" : "vsa.exe";
 			AssembleShader(compiler, shaderName + ".fxa", shaderName + "_temp_1.fxo", logger);
 			byte[] assembled = LoadCompiledShaderFunction(shaderName + "_temp_1.fxo");
 			if(assembled.Length == instructionBytes.Count)
@@ -233,7 +235,7 @@ namespace DXDecompilerCmd
 			{
 				try
 				{
-					string mainFunctionName = shader.Type == DXDecompiler.DX9Shader.ShaderType.Pixel ? "PixelMain" : "VertexMain";
+					string mainFunctionName = shader.Type == ShaderType.Pixel ? "PixelMain" : "VertexMain";
 					CompileShaderToAsm(shaderDisassembler.Version(), mainFunctionName, shaderName + ".fx", shaderName + "_temp.fxa", logger);
 
 					try
@@ -309,7 +311,7 @@ namespace DXDecompilerCmd
 						sw.WriteLine(shaderName + ".fx - unable to recompile");
 						if(File.Exists(shaderName + ".ERROR" + ".fx"))
 							File.Delete(shaderName + ".ERROR" + ".fx");
-						System.IO.File.Move(shaderName + ".fx", shaderName + ".ERROR" + ".fx");
+						File.Move(shaderName + ".fx", shaderName + ".ERROR" + ".fx");
 					}
 					else
 					{
@@ -343,10 +345,10 @@ namespace DXDecompilerCmd
 			{
 				return ProgramType.DXBC;
 			}
-			var dx9ShaderType = (DXDecompiler.DX9Shader.ShaderType)BitConverter.ToUInt16(data, 2);
-			if(dx9ShaderType == DXDecompiler.DX9Shader.ShaderType.Vertex ||
-				dx9ShaderType == DXDecompiler.DX9Shader.ShaderType.Pixel ||
-				dx9ShaderType == DXDecompiler.DX9Shader.ShaderType.Effect)
+			var dx9ShaderType = (ShaderType)BitConverter.ToUInt16(data, 2);
+			if(dx9ShaderType == ShaderType.Vertex ||
+				dx9ShaderType == ShaderType.Pixel ||
+				dx9ShaderType == ShaderType.Effect)
 			{
 				return ProgramType.DX9;
 			}
@@ -384,6 +386,7 @@ namespace DXDecompilerCmd
 			options.DisableCleanup = false;
 			options.Verbose = false;
 			options.IgnorePreshaders = true;
+			options.UseAst = true;
 			for(int i = 0; i < args.Length; i++)
 			{
 				switch(args[i])
@@ -429,6 +432,10 @@ namespace DXDecompilerCmd
 						break;
 					case "-h":
 						options.Mode = DecompileMode.DebugHtml;
+						break;
+					case "-n":
+					case "--noast":
+						options.UseAst = false;
 						break;
 					default:
 						options.SourcePath = args[i];
@@ -502,7 +509,7 @@ namespace DXDecompilerCmd
 					}
 					else if(options.Mode == DecompileMode.DumpAssembly)
 					{
-						DXDecompiler.DX9Shader.ShaderModel model = DXDecompiler.DX9Shader.ShaderReader.ReadShader(data);
+						ShaderModel model = ShaderReader.ReadShader(data);
 
 						foreach(DXDecompiler.DX9Shader.FX9.Variable variable in model.EffectChunk.Variables)
 						{
@@ -525,7 +532,7 @@ namespace DXDecompilerCmd
 
 						foreach(DXDecompiler.DX9Shader.FX9.StateBlob blob in model.EffectChunk.StateBlobs)
 						{
-							if(blob.BlobType == DXDecompiler.DX9Shader.FX9.StateBlobType.Shader && blob.Shader.Type != DXDecompiler.DX9Shader.ShaderType.Expression)
+							if(blob.BlobType == DXDecompiler.DX9Shader.FX9.StateBlobType.Shader && blob.Shader.Type != ShaderType.Expression)
 							{
 								// I have no idea what these effects are?
 								if(blob.TechniqueIndex == 4294967295 || blob.PassIndex == 4294967295)
@@ -540,8 +547,8 @@ namespace DXDecompilerCmd
 					}
 					else if(options.Mode == DecompileMode.Reassemble)
 					{
-						var shaderType = (DXDecompiler.DX9Shader.ShaderType)BitConverter.ToUInt16(data, 2);
-						if(shaderType == DXDecompiler.DX9Shader.ShaderType.Effect)
+						var shaderType = (ShaderType)BitConverter.ToUInt16(data, 2);
+						if(shaderType == ShaderType.Effect)
 						{
 							var reader = new DebugBytecodeReader(data, 0, data.Length);
 							string error = "";
@@ -559,7 +566,7 @@ namespace DXDecompilerCmd
 								// everything before the variable blobs remains unchanged
 								uint variablesStart = ((DebugIndent)footerReader.GetNamedMember("VariableBlob 0")).AbsoluteIndex;
 								byte[] headerBytes = new byte[variablesStart];
-								Array.Copy(data, headerBytes, variablesStart);
+								Array.Copy(data, 0, headerBytes, 0, variablesStart);
 								writer.Write(headerBytes);
 
 								DebugEntry variableCountEntry = (DebugEntry)footerReader.GetNamedMember("VariableCount");
@@ -568,7 +575,7 @@ namespace DXDecompilerCmd
 								int variableBlobCount = Int32.Parse(variableBlobCountEntry.Value);
 								// used to get info about variable blobs
 								string[] variableBlobFiles = new string[variableBlobCount];
-								DXDecompiler.DX9Shader.ShaderModel model = DXDecompiler.DX9Shader.ShaderReader.ReadShader(data);
+								ShaderModel model = ShaderReader.ReadShader(data);
 								for(int i = 0; i < variableCount; ++i)
 								{
 									DXDecompiler.DX9Shader.FX9.Variable variable = model.EffectChunk.Variables[i];
@@ -777,10 +784,16 @@ namespace DXDecompilerCmd
 					{
 						try
 						{
-							var hlsl = DXDecompiler.DX9Shader.HlslWriter.Decompile(data);
+							var hlsl = HlslWriter.Decompile(
+								ShaderReader.ReadShader(data),
+								entryPoint: null,
+								effect: null,
+								outputDefaultValues: true,
+								doAstAnalysis: options.UseAst,
+								verbose: options.Verbose);
 							sw.Write(hlsl);
 						}
-						catch(Exception e) when(!System.Diagnostics.Debugger.IsAttached)
+						catch(Exception e) when(!Debugger.IsAttached)
 						{
 							Console.Error.WriteLine(e);
 							Environment.Exit(1);
@@ -789,8 +802,8 @@ namespace DXDecompilerCmd
 					else if(options.Mode == DecompileMode.Debug)
 					{
 						sw.WriteLine(string.Join(" ", args));
-						var shaderType = (DXDecompiler.DX9Shader.ShaderType)BitConverter.ToUInt16(data, 2);
-						if(shaderType == DXDecompiler.DX9Shader.ShaderType.Effect)
+						var shaderType = (ShaderType)BitConverter.ToUInt16(data, 2);
+						if(shaderType == ShaderType.Effect)
 						{
 							var reader = new DebugBytecodeReader(data, 0, data.Length);
 							string error = "";
@@ -834,8 +847,8 @@ namespace DXDecompilerCmd
 					}
 					else if(options.Mode == DecompileMode.DebugHtml)
 					{
-						var shaderType = (DXDecompiler.DX9Shader.ShaderType)BitConverter.ToUInt16(data, 2);
-						if(shaderType == DXDecompiler.DX9Shader.ShaderType.Effect)
+						var shaderType = (ShaderType)BitConverter.ToUInt16(data, 2);
+						if(shaderType == ShaderType.Effect)
 						{
 							var reader = new DebugBytecodeReader(data, 0, data.Length);
 							string error = "";

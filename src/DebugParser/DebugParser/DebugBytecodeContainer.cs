@@ -136,7 +136,7 @@ namespace DXDecompiler.DebugParser
 			get
 			{
 				var result = new List<Exception>();
-				if(this.Exception != null)
+				if(Exception != null)
 				{
 					result.Add(Exception);
 				}

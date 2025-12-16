@@ -1,4 +1,6 @@
-﻿namespace DXDecompiler.DX9Shader
+﻿using DXDecompiler.DX9Shader.Decompiler.Operations;
+
+namespace DXDecompiler.DX9Shader.Decompiler.Compiler
 {
 	public class LengthGrouper
 	{

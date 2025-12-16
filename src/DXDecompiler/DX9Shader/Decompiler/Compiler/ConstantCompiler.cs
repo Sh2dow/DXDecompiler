@@ -1,11 +1,11 @@
-﻿using System.Globalization;
-using System.Linq;
+﻿using System.Linq;
+using DXDecompiler.DX9Shader.Decompiler;
+using DXDecompiler.DX9Shader.Decompiler.Util;
 
-namespace DXDecompiler.DX9Shader
+namespace DXDecompiler.DX9Shader.Decompiler.Compiler
 {
 	public sealed class ConstantCompiler
 	{
-		private readonly CultureInfo _culture = CultureInfo.InvariantCulture;
 		private readonly NodeGrouper _nodeGrouper;
 
 		public ConstantCompiler(NodeGrouper nodeGrouper)
@@ -34,7 +34,7 @@ namespace DXDecompiler.DX9Shader
 
 		private string CompileConstant(ConstantNode firstConstant)
 		{
-			return firstConstant.Value.ToString(_culture);
+			return ConstantFormatter.FormatFloat(firstConstant.Value);
 		}
 	}
 }
