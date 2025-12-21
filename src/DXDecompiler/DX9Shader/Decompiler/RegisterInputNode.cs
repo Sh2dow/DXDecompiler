@@ -27,10 +27,22 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		}
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			if (depth > 128)
-				return "/*max depth reached*/";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			if (depth > 1024)
+			{
+				var maxDepthResult = "/*max depth reached*/";
+				SetCached(this, maxDepthResult);
+				return maxDepthResult;
+			}
 			if (!visited.Add(this))
-				return "/*cycle detected*/";
+			{
+				var cycleResult = "/*cycle detected*/";
+				SetCached(this, cycleResult);
+				return cycleResult;
+			}
 			var regType = RegisterComponentKey.Type;
 			var regNum = RegisterComponentKey.Number;
 			var comp = "";
@@ -59,7 +71,9 @@ namespace DXDecompiler.DX9Shader.Decompiler
 				_ => $"i.input{regNum}"
 			};
 			visited.Remove(this);
-			return semantic + comp;
+			var result = semantic + comp;
+			SetCached(this, result);
+			return result;
 		}
 	}
 }

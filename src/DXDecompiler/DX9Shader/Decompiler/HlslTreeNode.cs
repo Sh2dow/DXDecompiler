@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using DXDecompiler.DX9Shader.Decompiler.Operations;
 using System.Linq;
+using System.Threading;
 
 namespace DXDecompiler.DX9Shader.Decompiler
 {
@@ -10,27 +11,61 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public IList<HlslTreeNode> Inputs { get; } = new List<HlslTreeNode>();
 		public IList<HlslTreeNode> Outputs { get; } = new List<HlslTreeNode>();
 
+		private static readonly ThreadLocal<Dictionary<HlslTreeNode, string>> ToHlslCache =
+			new ThreadLocal<Dictionary<HlslTreeNode, string>>(() => new Dictionary<HlslTreeNode, string>());
+
+		protected static bool TryGetCached(HlslTreeNode node, out string value)
+		{
+			return ToHlslCache.Value.TryGetValue(node, out value);
+		}
+
+		protected static void SetCached(HlslTreeNode node, string value)
+		{
+			ToHlslCache.Value[node] = value;
+		}
+
+		protected static void ClearCache()
+		{
+			ToHlslCache.Value.Clear();
+		}
+
+		public static void ClearToHlslCache()
+		{
+			ClearCache();
+		}
+
 		private const int MaxToHlslDepth = 1024; // Increased depth limit for complex shaders
 		public virtual string ToHlsl()
 		{
+			ClearCache();
 			return ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		}
 		public virtual string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
 			if (depth > MaxToHlslDepth)
 			{
 				Console.WriteLine($"[HlslTreeNode] Max recursion depth reached in {GetType().Name} at depth {depth}");
-				return $"/* ERROR: Max recursion depth ({MaxToHlslDepth}) reached in {GetType().Name} */";
+				var maxDepthResult = $"/* ERROR: Max recursion depth ({MaxToHlslDepth}) reached in {GetType().Name} */";
+				SetCached(this, maxDepthResult);
+				return maxDepthResult;
 			}
 			if (!visited.Add(this))
 			{
 				Console.WriteLine($"[HlslTreeNode] Cycle detected in {GetType().Name} at depth {depth}");
-				return $"/* ERROR: Cycle detected in {GetType().Name} */";
+				var cycleResult = $"/* ERROR: Cycle detected in {GetType().Name} */";
+				SetCached(this, cycleResult);
+				return cycleResult;
 			}
 			if (Inputs.Count == 0)
 			{
 				Console.WriteLine($"[HlslTreeNode] Unmapped leaf node: {GetType().Name} at depth {depth}");
-				return $"/* Unmapped leaf node: {GetType().Name} */";
+				var unmappedResult = $"/* Unmapped leaf node: {GetType().Name} */";
+				SetCached(this, unmappedResult);
+				return unmappedResult;
 			}
 			string result;
 			try
@@ -43,6 +78,7 @@ namespace DXDecompiler.DX9Shader.Decompiler
 				result = $"/* ERROR: Exception in {GetType().Name}.ToHlsl: {ex.Message} */";
 			}
 			visited.Remove(this);
+			SetCached(this, result);
 			return result;
 		}
 
@@ -121,7 +157,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"lit({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"lit({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -136,7 +178,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"sign({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"sign({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -151,7 +199,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"exp2({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"exp2({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -166,7 +220,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"exp({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"exp({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -181,7 +241,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"clip({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"clip({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "null"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -197,7 +263,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "0"} + {Inputs[1]?.ToHlsl(visited, depth + 1) ?? "0"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "0"} + {Inputs[1]?.ToHlsl(visited, depth + 1) ?? "0"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -212,7 +284,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "0"} * {Inputs[1]?.ToHlsl(visited, depth + 1) ?? "0"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "0"} * {Inputs[1]?.ToHlsl(visited, depth + 1) ?? "0"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -227,7 +305,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "0"} - {Inputs[1]?.ToHlsl(visited, depth + 1) ?? "0"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"({Inputs[0]?.ToHlsl(visited, depth + 1) ?? "0"} - {Inputs[1]?.ToHlsl(visited, depth + 1) ?? "0"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -245,10 +329,23 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
 			int n = Inputs.Count / 2;
 			var v1 = string.Join(", ", Inputs.Take(n).Select(i => i?.ToHlsl(visited, depth + 1) ?? "0"));
 			var v2 = string.Join(", ", Inputs.Skip(n).Select(i => i?.ToHlsl(visited, depth + 1) ?? "0"));
-			return $"dot({v1}, {v2})";
+			var vecType = n switch
+			{
+				2 => "float2",
+				3 => "float3",
+				4 => "float4",
+				_ => $"float{n}"
+			};
+			var result = $"dot({vecType}({v1}), {vecType}({v2}))";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -262,7 +359,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return $"log2({Input?.ToHlsl(visited, depth + 1) ?? "null"})";
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = $"log2({Input?.ToHlsl(visited, depth + 1) ?? "null"})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -287,9 +390,15 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
 			var sampler = SamplerInput?.ToHlsl(visited, depth + 1) ?? "sampler";
 			var coords = string.Join(", ", TextureCoordinateInputs.Select(tc => tc.ToHlsl(visited, depth + 1)));
-			return $"tex2D({sampler}, {coords})";
+			var result = $"tex2D({sampler}, {coords})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 
@@ -300,7 +409,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		public override string ToHlsl() => ToHlsl(new HashSet<HlslTreeNode>(), 0);
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			return Util.ConstantFormatter.FormatFloat(Value);
+			if (TryGetCached(this, out var cached))
+			{
+				return cached;
+			}
+			var result = Util.ConstantFormatter.FormatFloat(Value);
+			SetCached(this, result);
+			return result;
 		}
 	}
 }

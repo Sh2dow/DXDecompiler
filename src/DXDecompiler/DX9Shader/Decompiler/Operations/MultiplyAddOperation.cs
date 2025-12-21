@@ -30,19 +30,29 @@ namespace DXDecompiler.DX9Shader.Decompiler.Operations
 		}
 		public override string ToHlsl(HashSet<HlslTreeNode> visited, int depth)
 		{
-			if (depth > 32)
+			if (TryGetCached(this, out var cached))
 			{
-				return $"/* ERROR: Max recursion depth reached in MultiplyAddOperation */";
+				return cached;
+			}
+			if (depth > 1024)
+			{
+				var maxDepthResult = $"/* ERROR: Max recursion depth reached in MultiplyAddOperation */";
+				SetCached(this, maxDepthResult);
+				return maxDepthResult;
 			}
 			if (!visited.Add(this))
 			{
-				return $"/* ERROR: Cycle detected in MultiplyAddOperation */";
+				var cycleResult = $"/* ERROR: Cycle detected in MultiplyAddOperation */";
+				SetCached(this, cycleResult);
+				return cycleResult;
 			}
 			string f1 = Factor1?.ToHlsl(visited, depth + 1) ?? "null";
 			string f2 = Factor2?.ToHlsl(visited, depth + 1) ?? "null";
 			string add = Addend?.ToHlsl(visited, depth + 1) ?? "null";
 			visited.Remove(this);
-			return $"({f1} * {f2} + {add})";
+			var result = $"({f1} * {f2} + {add})";
+			SetCached(this, result);
+			return result;
 		}
 	}
 }

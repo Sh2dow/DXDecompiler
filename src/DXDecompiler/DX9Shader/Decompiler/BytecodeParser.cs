@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using DXDecompiler.DX9Shader.Bytecode;
 using DXDecompiler.DX9Shader.Bytecode.Ctab;
 using DXDecompiler.DX9Shader.Decompiler.FlowControl;
@@ -13,6 +14,8 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		private Dictionary<RegisterComponentKey, HlslTreeNode> _activeOutputs;
 		private Dictionary<RegisterKey, HlslTreeNode> _samplers;
 		private List<IStatement> _statements = new List<IStatement>(); // New: statement list
+		private readonly Dictionary<NodeKey, HlslTreeNode> _nodeInterner = new Dictionary<NodeKey, HlslTreeNode>();
+		private readonly Dictionary<RegisterKey, int> _tempVersions = new Dictionary<RegisterKey, int>();
 
 		public HlslAst Parse(ShaderModel shader)
 		{
@@ -143,13 +146,31 @@ namespace DXDecompiler.DX9Shader.Decompiler
 				var newOutputs = new Dictionary<RegisterComponentKey, HlslTreeNode>();
 
 				RegisterComponentKey[] destinationKeys = GetDestinationKeys(instruction).ToArray();
+				var destIndex = instruction.GetDestinationParamIndex();
+				var destRegisterKey = instruction.GetParamRegisterKey(destIndex);
+				int? newTempVersion = null;
+				if (destRegisterKey.Type == RegisterType.Temp)
+				{
+					_tempVersions.TryGetValue(destRegisterKey, out var current);
+					newTempVersion = current + 1;
+				}
 				foreach(RegisterComponentKey destinationKey in destinationKeys)
 				{
 					HlslTreeNode instructionTree = CreateInstructionTree(instruction, destinationKey);
-					newOutputs[destinationKey] = instructionTree;
+					HlslTreeNode targetNode;
+					if (newTempVersion.HasValue)
+					{
+						targetNode = new VersionedRegisterInputNode(destRegisterKey, newTempVersion.Value, destinationKey.ComponentIndex);
+						newOutputs[destinationKey] = targetNode;
+					}
+					else
+					{
+						targetNode = new RegisterInputNode(destinationKey);
+						newOutputs[destinationKey] = instructionTree;
+					}
 					// Add as assignment statement
 					_statements.Add(new AssignmentStatement(
-						target: instructionTree, // For now, use the tree as both target and value
+						target: targetNode,
 						value: instructionTree,
 						inputs: new Dictionary<RegisterComponentKey, HlslTreeNode>() // TODO: Fill with actual inputs
 					));
@@ -158,6 +179,10 @@ namespace DXDecompiler.DX9Shader.Decompiler
 				foreach(var output in newOutputs)
 				{
 					_activeOutputs[output.Key] = output.Value;
+				}
+				if (newTempVersion.HasValue)
+				{
+					_tempVersions[destRegisterKey] = newTempVersion.Value;
 				}
 			}
 			// Integrate BreakStatement and ClipStatement for their opcodes
@@ -217,60 +242,84 @@ namespace DXDecompiler.DX9Shader.Decompiler
 					}
 				case Opcode.Abs:
 				case Opcode.Add:
+				case Opcode.Cnd:
 				case Opcode.Cmp:
+				case Opcode.DSX:
+				case Opcode.DSY:
+				case Opcode.Dst:
 				case Opcode.Frc:
+				case Opcode.LogP:
 				case Opcode.Lrp:
 				case Opcode.Mad:
 				case Opcode.Max:
 				case Opcode.Min:
 				case Opcode.Mov:
+				case Opcode.MovA:
 				case Opcode.Mul:
 				case Opcode.Pow:
 				case Opcode.Rcp:
 				case Opcode.Rsq:
+				case Opcode.Sgn:
 				case Opcode.SinCos:
 				case Opcode.Sge:
 				case Opcode.Slt:
+				case Opcode.Sub:
 					{
 						HlslTreeNode[] inputs = GetInputs(instruction, componentIndex);
 						switch(instruction.Opcode)
 						{
 							case Opcode.Abs:
-								return new AbsoluteOperation(inputs[0]);
+								return InternOperation(typeof(AbsoluteOperation), inputs, () => new AbsoluteOperation(inputs[0]));
+							case Opcode.Cnd:
+								return InternOperation(typeof(CompareOperation), inputs, () => new CompareOperation(inputs[0], inputs[1], inputs[2]));
 							case Opcode.Cmp:
-								return new CompareOperation(inputs[0], inputs[1], inputs[2]);
+								return InternOperation(typeof(CompareOperation), inputs, () => new CompareOperation(inputs[0], inputs[1], inputs[2]));
+							case Opcode.DSX:
+								return InternOperation(typeof(DerivativeXOperation), inputs, () => new DerivativeXOperation(inputs[0]));
+							case Opcode.DSY:
+								return InternOperation(typeof(DerivativeYOperation), inputs, () => new DerivativeYOperation(inputs[0]));
+							case Opcode.Dst:
+								return CreateDstNode(instruction, componentIndex);
 							case Opcode.Frc:
-								return new FractionalOperation(inputs[0]);
+								return InternOperation(typeof(FractionalOperation), inputs, () => new FractionalOperation(inputs[0]));
+							case Opcode.LogP:
+								return InternOperation(typeof(LogOperation), inputs, () => new LogOperation(inputs[0]));
 							case Opcode.Lrp:
-								return new LinearInterpolateOperation(inputs[0], inputs[1], inputs[2]);
+								return InternOperation(typeof(LinearInterpolateOperation), inputs, () => new LinearInterpolateOperation(inputs[0], inputs[1], inputs[2]));
 							case Opcode.Max:
-								return new MaximumOperation(inputs[0], inputs[1]);
+								return InternOperation(typeof(MaximumOperation), inputs, () => new MaximumOperation(inputs[0], inputs[1]));
 							case Opcode.Min:
-								return new MinimumOperation(inputs[0], inputs[1]);
+								return InternOperation(typeof(MinimumOperation), inputs, () => new MinimumOperation(inputs[0], inputs[1]));
 							case Opcode.Mov:
-								return new MoveOperation(inputs[0]);
+								return InternOperation(typeof(MoveOperation), inputs, () => new MoveOperation(inputs[0]));
+							case Opcode.MovA:
+								return InternOperation(typeof(MoveOperation), inputs, () => new MoveOperation(inputs[0]));
 							case Opcode.Add:
-								return new AddOperation(inputs[0], inputs[1]);
+								return InternOperation(typeof(AddOperation), inputs, () => new AddOperation(inputs[0], inputs[1]));
 							case Opcode.Mul:
-								return new MultiplyOperation(inputs[0], inputs[1]);
+								return InternOperation(typeof(MultiplyOperation), inputs, () => new MultiplyOperation(inputs[0], inputs[1]));
 							case Opcode.Mad:
-								return new MultiplyAddOperation(inputs[0], inputs[1], inputs[2]);
+								return InternOperation(typeof(MultiplyAddOperation), inputs, () => new MultiplyAddOperation(inputs[0], inputs[1], inputs[2]));
 							case Opcode.Pow:
-								return new PowerOperation(inputs[0], inputs[1]);
+								return InternOperation(typeof(PowerOperation), inputs, () => new PowerOperation(inputs[0], inputs[1]));
 							case Opcode.Rcp:
-								return new ReciprocalOperation(inputs[0]);
+								return InternOperation(typeof(ReciprocalOperation), inputs, () => new ReciprocalOperation(inputs[0]));
 							case Opcode.Rsq:
-								return new ReciprocalSquareRootOperation(inputs[0]);
+								return InternOperation(typeof(ReciprocalSquareRootOperation), inputs, () => new ReciprocalSquareRootOperation(inputs[0]));
+							case Opcode.Sgn:
+								return InternOperation(typeof(SignOperation), inputs, () => new SignOperation(inputs[0]));
 							case Opcode.SinCos:
 								if(componentIndex == 0)
 								{
-									return new CosineOperation(inputs[0]);
+									return InternOperation(typeof(CosineOperation), inputs, () => new CosineOperation(inputs[0]));
 								}
-								return new SineOperation(inputs[0]);
+								return InternOperation(typeof(SineOperation), inputs, () => new SineOperation(inputs[0]));
 							case Opcode.Sge:
-								return new SignGreaterOrEqualOperation(inputs[0], inputs[1]);
+								return InternOperation(typeof(SignGreaterOrEqualOperation), inputs, () => new SignGreaterOrEqualOperation(inputs[0], inputs[1]));
 							case Opcode.Slt:
-								return new SignLessOperation(inputs[0], inputs[1]);
+								return InternOperation(typeof(SignLessOperation), inputs, () => new SignLessOperation(inputs[0], inputs[1]));
+							case Opcode.Sub:
+								return InternOperation(typeof(SubtractOperation), inputs, () => new SubtractOperation(inputs[0], inputs[1]));
 							default:
 								throw new NotImplementedException();
 						}
@@ -332,13 +381,23 @@ namespace DXDecompiler.DX9Shader.Decompiler
 					{
 						var vector1 = new List<HlslTreeNode>(GetInputComponents(instruction, 1, 3));
 						var vector2 = new List<HlslTreeNode>(GetInputComponents(instruction, 2, 3));
-						return new DotProductOperation(vector1, vector2);
+						return InternOperation(typeof(DotProductOperation), vector1.Concat(vector2).ToArray(),
+							() => new DotProductOperation(vector1, vector2));
+					}
+				case Opcode.Crs:
+					{
+						return CreateCrossProductNode(instruction, componentIndex);
+					}
+				case Opcode.DP2Add:
+					{
+						return CreateDotProduct2AddNode(instruction);
 					}
 				case Opcode.Dp4:
 					{
 						var vector1 = new List<HlslTreeNode>(GetInputComponents(instruction, 1, 4));
 						var vector2 = new List<HlslTreeNode>(GetInputComponents(instruction, 2, 4));
-						return new DotProductOperation(vector1, vector2);
+						return InternOperation(typeof(DotProductOperation), vector1.Concat(vector2).ToArray(),
+							() => new DotProductOperation(vector1, vector2));
 					}
 				case Opcode.Nrm:
 					{
@@ -354,17 +413,18 @@ namespace DXDecompiler.DX9Shader.Decompiler
 							}
 							inputs.Add(input);
 						}
-						return new NormalizeOutputNode(inputs, componentIndex);
+						return InternOperation(typeof(NormalizeOutputNode), inputs.ToArray(),
+							() => new NormalizeOutputNode(inputs, componentIndex));
 					}
 				case Opcode.Lit:
 					{
 						var inputs = GetInputs(instruction, componentIndex);
-						return new LitOperation(inputs[0]);
+						return InternOperation(typeof(LitOperation), inputs, () => new LitOperation(inputs[0]));
 					}
 				case Opcode.Log:
 					{
 						var inputs = GetInputs(instruction, componentIndex);
-						return new LogOperation(inputs[0]);
+						return InternOperation(typeof(LogOperation), inputs, () => new LogOperation(inputs[0]));
 					}
 				default:
 					throw new NotImplementedException($"{instruction.Opcode} not implemented");
@@ -442,6 +502,53 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			return new NormalizeOutputNode(inputs, outputComponent);
 		}
 
+		private HlslTreeNode CreateDstNode(InstructionToken instruction, int outputComponent)
+		{
+			// dst: (1, src0.y * src1.y, src0.z, src1.w)
+			switch(outputComponent)
+			{
+				case 0:
+					return new ConstantNode(1.0f);
+				case 1:
+					{
+						var src0y = GetInputComponents(instruction, 1, 4)[1];
+						var src1y = GetInputComponents(instruction, 2, 4)[1];
+						return new MultiplyOperation(src0y, src1y);
+					}
+				case 2:
+					return GetInputComponents(instruction, 1, 4)[2];
+				case 3:
+					return GetInputComponents(instruction, 2, 4)[3];
+				default:
+					return new ConstantNode(0.0f);
+			}
+		}
+
+		private HlslTreeNode CreateCrossProductNode(InstructionToken instruction, int outputComponent)
+		{
+			var v1 = GetInputComponents(instruction, 1, 3);
+			var v2 = GetInputComponents(instruction, 2, 3);
+			switch(outputComponent)
+			{
+				case 0:
+					return new SubtractOperation(
+						new MultiplyOperation(v1[1], v2[2]),
+						new MultiplyOperation(v1[2], v2[1]));
+				case 1:
+					return new SubtractOperation(
+						new MultiplyOperation(v1[2], v2[0]),
+						new MultiplyOperation(v1[0], v2[2]));
+				case 2:
+					return new SubtractOperation(
+						new MultiplyOperation(v1[0], v2[1]),
+						new MultiplyOperation(v1[1], v2[0]));
+				case 3:
+					return new ConstantNode(0.0f);
+				default:
+					return new ConstantNode(0.0f);
+			}
+		}
+
 		private HlslTreeNode[] GetInputs(InstructionToken instruction, int componentIndex)
 		{
 			int numInputs = GetNumInputs(instruction.Opcode);
@@ -450,12 +557,7 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			{
 				int inputParameterIndex = i + 1;
 				RegisterComponentKey inputKey = GetParamRegisterComponentKey(instruction, inputParameterIndex, componentIndex);
-				if (!_activeOutputs.TryGetValue(inputKey, out HlslTreeNode input))
-				{
-					// Create a stub RegisterInputNode if missing
-					input = new RegisterInputNode(inputKey);
-					_activeOutputs[inputKey] = input;
-				}
+				var input = GetActiveOutputOrCreate(inputKey);
 				var modifier = instruction.GetSourceModifier(inputParameterIndex);
 				input = ApplyModifier(input, modifier);
 				inputs[i] = input;
@@ -469,12 +571,7 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			for(int i = 0; i < numComponents; i++)
 			{
 				RegisterComponentKey inputKey = GetParamRegisterComponentKey(instruction, inputParameterIndex, i);
-				if (!_activeOutputs.TryGetValue(inputKey, out HlslTreeNode input))
-				{
-					// Create a stub RegisterInputNode if missing
-					input = new RegisterInputNode(inputKey);
-					_activeOutputs[inputKey] = input;
-				}
+				var input = GetActiveOutputOrCreate(inputKey);
 				var modifier = instruction.GetSourceModifier(inputParameterIndex);
 				input = ApplyModifier(input, modifier);
 				components[i] = input;
@@ -530,19 +627,26 @@ namespace DXDecompiler.DX9Shader.Decompiler
 				case Opcode.Rcp:
 				case Opcode.Rsq:
 				case Opcode.SinCos:
+				case Opcode.MovA:
+				case Opcode.Sgn:
+				case Opcode.LogP:
 					return 1;
 				case Opcode.Add:
+				case Opcode.Crs:
 				case Opcode.Dp3:
 				case Opcode.Dp4:
+				case Opcode.Dst:
 				case Opcode.Max:
 				case Opcode.Min:
 				case Opcode.Mul:
 				case Opcode.Pow:
 				case Opcode.Sge:
 				case Opcode.Slt:
+				case Opcode.Sub:
 				case Opcode.Tex:
 					return 2;
 				case Opcode.Cmp:
+				case Opcode.Cnd:
 				case Opcode.DP2Add:
 				case Opcode.Lrp:
 				case Opcode.Mad:
@@ -562,6 +666,93 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			int componentIndex = swizzle[component];
 
 			return new RegisterComponentKey(registerKey, componentIndex);
+		}
+
+		private HlslTreeNode GetActiveOutputOrCreate(RegisterComponentKey inputKey)
+		{
+			if (_activeOutputs.TryGetValue(inputKey, out HlslTreeNode input))
+			{
+				return input;
+			}
+
+			if (inputKey.Type == RegisterType.Temp)
+			{
+				_tempVersions.TryGetValue(inputKey.RegisterKey, out var version);
+				input = new VersionedRegisterInputNode(inputKey.RegisterKey, version, inputKey.ComponentIndex);
+			}
+			else
+			{
+				input = new RegisterInputNode(inputKey);
+			}
+			_activeOutputs[inputKey] = input;
+			return input;
+		}
+
+		private HlslTreeNode InternOperation(Type opType, HlslTreeNode[] inputs, Func<HlslTreeNode> factory)
+		{
+			var key = new NodeKey(opType, inputs);
+			if (_nodeInterner.TryGetValue(key, out var existing))
+			{
+				return existing;
+			}
+			var created = factory();
+			_nodeInterner[key] = created;
+			return created;
+		}
+
+		private readonly struct NodeKey
+		{
+			private readonly Type _type;
+			private readonly HlslTreeNode[] _inputs;
+			private readonly int _hashCode;
+
+			public NodeKey(Type type, HlslTreeNode[] inputs)
+			{
+				_type = type;
+				_inputs = inputs;
+				unchecked
+				{
+					int hash = type.GetHashCode();
+					if (inputs != null)
+					{
+						for (int i = 0; i < inputs.Length; i++)
+						{
+							hash = (hash * 397) ^ RuntimeHelpers.GetHashCode(inputs[i]);
+						}
+					}
+					_hashCode = hash;
+				}
+			}
+
+			public override int GetHashCode() => _hashCode;
+
+			public override bool Equals(object obj)
+			{
+				if (obj is not NodeKey other)
+				{
+					return false;
+				}
+				if (!ReferenceEquals(_type, other._type))
+				{
+					return false;
+				}
+				if (_inputs == null || other._inputs == null)
+				{
+					return _inputs == other._inputs;
+				}
+				if (_inputs.Length != other._inputs.Length)
+				{
+					return false;
+				}
+				for (int i = 0; i < _inputs.Length; i++)
+				{
+					if (!ReferenceEquals(_inputs[i], other._inputs[i]))
+					{
+						return false;
+					}
+				}
+				return true;
+			}
 		}
 	}
 }

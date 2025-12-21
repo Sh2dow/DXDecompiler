@@ -73,8 +73,12 @@ namespace DXDecompiler.DX9Shader.Decompiler
 		// === Added fields/constants for recursion and diagnostics ===
 		private const int MaxRecursionDepth = 256;
 		private const int MaxAstStatements = 8192;
+		private const int MaxInlineExpressionLength = 1024;
+		private const int MaxTruncatePreviewLength = 256;
+		private const int MaxAstExpressionCost = 24;
 		private readonly List<string> skippedAssignments = new List<string>();
 		private readonly bool _verbose;
+		private int _astTempIndex = 0;
 
 		public HlslWriter(ShaderModel shader, bool doAstAnalysis = false, string entryPoint = null,
 			bool outputDefaultValues = true, bool verbose = false)
@@ -400,6 +404,13 @@ namespace DXDecompiler.DX9Shader.Decompiler
 					WriteAssignment("dot({0}, {1}) + {2}",
 						GetSourceName(instruction, 1), GetSourceName(instruction, 2), GetSourceName(instruction, 3));
 					break;
+				case Opcode.Crs:
+					WriteAssignment("cross({0}.xyz, {1}.xyz)", GetSourceName(instruction, 1), GetSourceName(instruction, 2));
+					break;
+				case Opcode.Dst:
+					WriteAssignment("float4(1, {0}.y * {1}.y, {0}.z, {1}.w)",
+						GetSourceName(instruction, 1), GetSourceName(instruction, 2));
+					break;
 				case Opcode.Dp3:
 					WriteAssignment("dot({0}, {1})", GetSourceName(instruction, 1), GetSourceName(instruction, 2));
 					break;
@@ -501,6 +512,9 @@ namespace DXDecompiler.DX9Shader.Decompiler
 					break;
 				}
 				case Opcode.Log:
+					WriteAssignment("log2({0})", GetSourceName(instruction, 1));
+					break;
+				case Opcode.LogP:
 					WriteAssignment("log2({0})", GetSourceName(instruction, 1));
 					break;
 				case Opcode.Lrp:
@@ -613,6 +627,9 @@ namespace DXDecompiler.DX9Shader.Decompiler
 					break;
 				case Opcode.Sub:
 					WriteAssignment("{0} - {1}", GetSourceName(instruction, 1), GetSourceName(instruction, 2));
+					break;
+				case Opcode.Sgn:
+					WriteAssignment("sign({0})", GetSourceName(instruction, 1));
 					break;
 				case Opcode.Tex:
 					if(_shader.MajorVersion > 1)
@@ -832,25 +849,41 @@ namespace DXDecompiler.DX9Shader.Decompiler
 
 					if (ast.Statements != null && ast.Statements.Count > 0)
 					{
+						HlslTreeNode.ClearToHlslCache();
 						int statementCount = 0;
 						foreach (var statement in ast.Statements)
 						{
 							if (statement is AssignmentStatement assign)
 							{
-								var lhs = assign.Target?.ToHlsl(new HashSet<HlslTreeNode>(), MaxRecursionDepth);
+								var lhs = GetAssignmentTargetName(assign.Target);
 								var rhs = assign.Value?.ToHlsl(new HashSet<HlslTreeNode>(), MaxRecursionDepth);
 
-								bool lhsIsOutput = lhs != null && (lhs.StartsWith("o.") || lhs.StartsWith("o["));
-								bool rhsIsValid = !string.IsNullOrWhiteSpace(rhs) && !rhs.Contains("unhandled-leaf") && !rhs.Contains("not implemented") && !rhs.Contains("Unmapped") && !rhs.Contains("invalid") && !rhs.All(char.IsDigit) && !rhs.Contains("/* ERROR: Max recursion depth") && !rhs.Contains("/* ERROR: Cycle detected");
-								bool lhsIsValid = !string.IsNullOrWhiteSpace(lhs) && !lhs.Contains("unhandled-leaf") && !lhs.Contains("not implemented") && !lhs.Contains("Unmapped") && !lhs.Contains("invalid") && !lhs.All(char.IsDigit) && !lhs.Contains("/* ERROR: Max recursion depth") && !lhs.Contains("/* ERROR: Cycle detected");
+								bool lhsIsOutput = IsOutputTarget(assign.Target, lhs);
+								bool rhsIsValid = IsValidAstExpression(rhs, isOutputTarget: lhsIsOutput);
+								bool lhsIsValid = IsValidAstExpression(lhs, isOutputTarget: lhsIsOutput);
 								bool notIdentity = !IsIdentityAssignment(lhs, rhs);
 
-								if (lhsIsOutput && lhsIsValid && rhsIsValid && notIdentity)
+								if (lhsIsOutput && lhsIsValid && notIdentity)
 								{
-									WriteIndent();
-									WriteLine($"{lhs} = {rhs};");
+									var rhsInline = BuildReadableExpression(assign.Value, out var tempLines);
+									foreach (var line in tempLines)
+									{
+										WriteIndent();
+										WriteLine(line);
+									}
+									if (rhsIsValid)
+									{
+										WriteIndent();
+										WriteLine($"{lhs} = {rhsInline};");
+										Console.WriteLine($"[HlslWriter]   -> Written: {lhs} = {rhsInline}");
+									}
+									else
+									{
+										WriteIndent();
+										WriteLine($"{lhs} = /* invalid/cyclic RHS */ {rhsInline};");
+										Console.WriteLine($"[HlslWriter]   -> Written with invalid RHS: {lhs} = {rhsInline}");
+									}
 									wroteAssignment = true;
-									Console.WriteLine($"[HlslWriter]   -> Written: {lhs} = {rhs}");
 								}
 								else if (!rhsIsValid || !lhsIsValid)
 								{
@@ -865,12 +898,6 @@ namespace DXDecompiler.DX9Shader.Decompiler
 										fallbackToInstructions = true;
 										break;
 									}
-								}
-								else if (lhsIsOutput && lhsIsValid && notIdentity)
-								{
-									WriteIndent();
-									WriteLine($"{lhs} = /* Skipped invalid/cyclic RHS */ 0; // {rhs}");
-									wroteAssignment = true;
 								}
 							}
 							statementCount++;
@@ -1068,19 +1095,372 @@ namespace DXDecompiler.DX9Shader.Decompiler
 
 		private static bool IsIdentityAssignment(string lhs, string rhs)
 		{
-			// Remove whitespace for comparison
-			return lhs.Replace(" ", "") == rhs.Replace(" ", "");
+			if (string.IsNullOrEmpty(lhs) || string.IsNullOrEmpty(rhs))
+			{
+				return false;
+			}
+
+			// Compare while skipping spaces to avoid large allocations.
+			int i = 0;
+			int j = 0;
+			while (i < lhs.Length && j < rhs.Length)
+			{
+				while (i < lhs.Length && lhs[i] == ' ')
+				{
+					i++;
+				}
+				while (j < rhs.Length && rhs[j] == ' ')
+				{
+					j++;
+				}
+
+				if (i >= lhs.Length || j >= rhs.Length)
+				{
+					break;
+				}
+
+				if (lhs[i] != rhs[j])
+				{
+					return false;
+				}
+
+				i++;
+				j++;
+			}
+
+			while (i < lhs.Length && lhs[i] == ' ')
+			{
+				i++;
+			}
+			while (j < rhs.Length && rhs[j] == ' ')
+			{
+				j++;
+			}
+
+			return i == lhs.Length && j == rhs.Length;
+		}
+
+		private static bool IsValidAstExpression(string value, bool isOutputTarget)
+		{
+			if (string.IsNullOrWhiteSpace(value))
+			{
+				return false;
+			}
+			if (value.All(char.IsDigit))
+			{
+				return false;
+			}
+			// Skip expensive scans for non-output assignments to keep AST emission fast.
+			if (!isOutputTarget)
+			{
+				return true;
+			}
+
+			if (value.Contains("unhandled-leaf", StringComparison.OrdinalIgnoreCase))
+			{
+				return false;
+			}
+			if (value.Contains("not implemented", StringComparison.OrdinalIgnoreCase))
+			{
+				return false;
+			}
+			if (value.Contains("unmapped", StringComparison.OrdinalIgnoreCase))
+			{
+				return false;
+			}
+			if (value.Contains("/* ERROR: Max recursion depth", StringComparison.Ordinal))
+			{
+				return false;
+			}
+			if (value.Contains("/* ERROR: Cycle detected", StringComparison.Ordinal))
+			{
+				return false;
+			}
+
+			return true;
+		}
+
+		private string BuildReadableExpression(HlslTreeNode node, out List<string> tempLines)
+		{
+			tempLines = new List<string>();
+			if (node == null)
+			{
+				return "0";
+			}
+			var useCounts = new Dictionary<HlslTreeNode, int>();
+			CollectUseCounts(node, useCounts, new HashSet<HlslTreeNode>());
+			var costCache = new Dictionary<HlslTreeNode, int>();
+			var tempMap = new Dictionary<HlslTreeNode, string>();
+			var renderCache = new Dictionary<HlslTreeNode, string>();
+			return EmitNodeExpression(node, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: true, new HashSet<HlslTreeNode>(), 0);
+		}
+
+		private void CollectUseCounts(HlslTreeNode node, Dictionary<HlslTreeNode, int> counts, HashSet<HlslTreeNode> visited)
+		{
+			if (node == null || !visited.Add(node))
+			{
+				return;
+			}
+			if (!counts.TryAdd(node, 1))
+			{
+				counts[node]++;
+			}
+			foreach (var input in node.Inputs)
+			{
+				CollectUseCounts(input, counts, visited);
+			}
+		}
+
+		private int EstimateCost(HlslTreeNode node, Dictionary<HlslTreeNode, int> cache)
+		{
+			if (node == null)
+			{
+				return 0;
+			}
+			if (cache.TryGetValue(node, out var cached))
+			{
+				return cached;
+			}
+			int cost = 1;
+			foreach (var input in node.Inputs)
+			{
+				cost += EstimateCost(input, cache);
+				if (cost > MaxAstExpressionCost * 2)
+				{
+					break;
+				}
+			}
+			cache[node] = cost;
+			return cost;
+		}
+
+		private string EmitNodeExpression(
+			HlslTreeNode node,
+			Dictionary<HlslTreeNode, int> useCounts,
+			Dictionary<HlslTreeNode, int> costCache,
+			Dictionary<HlslTreeNode, string> tempMap,
+			List<string> tempLines,
+			Dictionary<HlslTreeNode, string> renderCache,
+			bool spillRoot,
+			HashSet<HlslTreeNode> visiting,
+			int depth)
+		{
+			if (node == null)
+			{
+				return "0";
+			}
+			if (tempMap.TryGetValue(node, out var existing))
+			{
+				return existing;
+			}
+			if (renderCache.TryGetValue(node, out var cached))
+			{
+				return cached;
+			}
+			if (!visiting.Add(node))
+			{
+				return "/* cycle */";
+			}
+
+			var cost = EstimateCost(node, costCache);
+			var shouldSpill = !spillRoot &&
+				((useCounts.TryGetValue(node, out var uses) && uses > 1) || cost > MaxAstExpressionCost);
+
+			var expr = BuildNodeExpression(node, useCounts, costCache, tempMap, tempLines, renderCache, visiting, depth + 1);
+			if (!spillRoot && expr.Length > MaxInlineExpressionLength)
+			{
+				shouldSpill = true;
+			}
+
+			string result;
+			if (shouldSpill)
+			{
+				var tempVar = $"ast_tmp{_astTempIndex++}";
+				tempMap[node] = tempVar;
+				tempLines.Add($"float {tempVar} = {expr};");
+				result = tempVar;
+			}
+			else
+			{
+				result = expr;
+			}
+
+			renderCache[node] = result;
+			visiting.Remove(node);
+			return result;
+		}
+
+		private string BuildNodeExpression(
+			HlslTreeNode node,
+			Dictionary<HlslTreeNode, int> useCounts,
+			Dictionary<HlslTreeNode, int> costCache,
+			Dictionary<HlslTreeNode, string> tempMap,
+			List<string> tempLines,
+			Dictionary<HlslTreeNode, string> renderCache,
+			HashSet<HlslTreeNode> visiting,
+			int depth)
+		{
+			if (node is ConstantNode constantNode)
+			{
+				return Util.ConstantFormatter.FormatFloat(constantNode.Value);
+			}
+			if (node is RegisterInputNode regInput)
+			{
+				return regInput.ToHlsl(new HashSet<HlslTreeNode>(), 0);
+			}
+			if (node is TempValueNode tempNode)
+			{
+				return tempNode.Name;
+			}
+			if (node is TextureLoadOutputNode texNode)
+			{
+				var sampler = EmitNodeExpression(texNode.SamplerInput, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
+				var coords = string.Join(", ",
+					texNode.TextureCoordinateInputs.Select(tc =>
+						EmitNodeExpression(tc, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth)));
+				return $"tex2D({sampler}, {coords})";
+			}
+			if (node is NormalizeOutputNode normalizeNode)
+			{
+				var inputExpr = EmitNodeExpression(normalizeNode.Inputs.FirstOrDefault(), useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
+				return $"normalize({inputExpr})";
+			}
+			if (node is LogOperation logNode)
+			{
+				var inputExpr = EmitNodeExpression(logNode.Input, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
+				return $"log2({inputExpr})";
+			}
+
+			if (node is DXDecompiler.DX9Shader.Decompiler.Operations.Operation op)
+			{
+				var args = op.Inputs
+					.Select(input => EmitNodeExpression(input, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth))
+					.ToList();
+				switch (op.Mnemonic)
+				{
+					case "add":
+						return $"({args[0]} + {args[1]})";
+					case "sub":
+						return $"({args[0]} - {args[1]})";
+					case "mul":
+						return $"({args[0]} * {args[1]})";
+					case "mad":
+					case "madd":
+						return $"({args[0]} * {args[1]} + {args[2]})";
+					case "min":
+						return $"min({args[0]}, {args[1]})";
+					case "max":
+						return $"max({args[0]}, {args[1]})";
+					case "abs":
+						return $"abs({args[0]})";
+					case "frc":
+						return $"frac({args[0]})";
+					case "pow":
+						return $"pow({args[0]}, {args[1]})";
+					case "rcp":
+						return $"(1.0 / {args[0]})";
+					case "rsq":
+						return $"rsqrt({args[0]})";
+					case "lrp":
+						return $"lerp({args[2]}, {args[1]}, {args[0]})";
+					case "cmp":
+						return $"(({args[0]} >= 0) ? {args[1]} : {args[2]})";
+					case "sge":
+						return $"(({args[0]} >= {args[1]}) ? 1 : 0)";
+					case "slt":
+						return $"(({args[0]} < {args[1]}) ? 1 : 0)";
+					case "cos":
+						return $"cos({args[0]})";
+					case "sin":
+						return $"sin({args[0]})";
+					case "sqrt":
+						return $"sqrt({args[0]})";
+					case "lit":
+						return $"lit({args[0]})";
+					case "sign":
+						return $"sign({args[0]})";
+					case "-":
+						return $"(-{args[0]})";
+					case "dot":
+						{
+							int n = args.Count / 2;
+							var v1 = string.Join(", ", args.Take(n));
+							var v2 = string.Join(", ", args.Skip(n));
+							var vecType = n switch
+							{
+								2 => "float2",
+								3 => "float3",
+								4 => "float4",
+								_ => $"float{n}"
+							};
+							return $"dot({vecType}({v1}), {vecType}({v2}))";
+						}
+					default:
+						return $"{op.Mnemonic}({string.Join(", ", args)})";
+				}
+			}
+
+			return node.ToHlsl(new HashSet<HlslTreeNode>(), 0);
+		}
+
+		private string GetAssignmentTargetName(HlslTreeNode target)
+		{
+			if (target is RegisterInputNode registerTarget)
+			{
+				var registerKey = registerTarget.RegisterComponentKey.RegisterKey;
+				string registerName;
+				uint registerLength;
+				try
+				{
+					registerName = _registers.GetRegisterName(registerKey);
+					registerLength = _registers.GetRegisterFullLength(registerKey);
+				}
+				catch (KeyNotFoundException)
+				{
+					// Fallback for registers not declared in RegisterState (e.g., consts in AST targets)
+					registerName = registerKey.ToString();
+					registerLength = 4;
+				}
+				if (registerLength == 1)
+				{
+					return registerName;
+				}
+
+				var componentSuffix = registerTarget.RegisterComponentKey.ComponentIndex switch
+				{
+					0 => ".x",
+					1 => ".y",
+					2 => ".z",
+					3 => ".w",
+					_ => string.Empty
+				};
+				return registerName + componentSuffix;
+			}
+
+			return target?.ToHlsl(new HashSet<HlslTreeNode>(), MaxRecursionDepth);
+		}
+
+		private bool IsOutputTarget(HlslTreeNode target, string fallbackName)
+		{
+			if (target is RegisterInputNode registerTarget)
+			{
+				return _registers.MethodOutputRegisters.ContainsKey(registerTarget.RegisterComponentKey.RegisterKey);
+			}
+
+			return fallbackName != null &&
+			       (fallbackName.StartsWith("o.") || fallbackName.StartsWith("o[") || fallbackName.StartsWith("out_"));
 		}
 
 		private void WriteAst(HlslAst ast)
 		{
 			if (ast.Statements != null && ast.Statements.Count > 0)
 			{
+				HlslTreeNode.ClearToHlslCache();
 				foreach (var statement in ast.Statements)
 				{
 					if (statement is AssignmentStatement assign)
 					{
-						var lhs = assign.Target?.ToString();
+						var lhs = GetAssignmentTargetName(assign.Target) ?? assign.Target?.ToString();
 						var rhs = assign.Value?.ToString();
 						// Only output if LHS is a valid HLSL identifier and not an identity assignment
 						if (IsValidHlslIdentifier(lhs) && !IsIdentityAssignment(lhs, rhs))
