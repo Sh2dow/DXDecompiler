@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using DXDecompiler.DX9Shader.Bytecode;
@@ -23,7 +23,11 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			while(instructionPointer < shader.Tokens.Count)
 			{
 				var instruction = shader.Tokens[instructionPointer] as InstructionToken;
-				if(instruction == null) continue;
+				if(instruction == null)
+				{
+					instructionPointer++;
+					continue;
+				}
 				if(ifBlock)
 				{
 					if(instruction.Opcode == Opcode.Else)
