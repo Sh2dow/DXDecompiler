@@ -885,6 +885,19 @@ namespace DXDecompiler.DX9Shader.Decompiler
 									}
 									wroteAssignment = true;
 								}
+								else if (!lhsIsOutput && lhsIsValid && rhsIsValid && notIdentity)
+								{
+									// Emit non-output assignments in instruction order to preserve original flow.
+									var rhsInline = BuildReadableExpression(assign.Value, out var tempLines);
+									foreach (var line in tempLines)
+									{
+										WriteIndent();
+										WriteLine(line);
+									}
+									WriteIndent();
+									WriteLine($"{lhs} = {rhsInline};");
+									wroteAssignment = true;
+								}
 								else if (!rhsIsValid || !lhsIsValid)
 								{
 									// Track skipped assignments but don't log each one to avoid slowdown
@@ -1192,7 +1205,8 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			var costCache = new Dictionary<HlslTreeNode, int>();
 			var tempMap = new Dictionary<HlslTreeNode, string>();
 			var renderCache = new Dictionary<HlslTreeNode, string>();
-			return EmitNodeExpression(node, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: true, new HashSet<HlslTreeNode>(), 0);
+			var widthCache = new Dictionary<HlslTreeNode, int>();
+			return EmitNodeExpression(node, useCounts, costCache, widthCache, tempMap, tempLines, renderCache, spillRoot: true, new HashSet<HlslTreeNode>(), 0);
 		}
 
 		private void CollectUseCounts(HlslTreeNode node, Dictionary<HlslTreeNode, int> counts, HashSet<HlslTreeNode> visited)
@@ -1238,6 +1252,7 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			HlslTreeNode node,
 			Dictionary<HlslTreeNode, int> useCounts,
 			Dictionary<HlslTreeNode, int> costCache,
+			Dictionary<HlslTreeNode, int> widthCache,
 			Dictionary<HlslTreeNode, string> tempMap,
 			List<string> tempLines,
 			Dictionary<HlslTreeNode, string> renderCache,
@@ -1266,7 +1281,7 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			var shouldSpill = !spillRoot &&
 				((useCounts.TryGetValue(node, out var uses) && uses > 1) || cost > MaxAstExpressionCost);
 
-			var expr = BuildNodeExpression(node, useCounts, costCache, tempMap, tempLines, renderCache, visiting, depth + 1);
+			var expr = BuildNodeExpression(node, useCounts, costCache, widthCache, tempMap, tempLines, renderCache, visiting, depth + 1);
 			if (!spillRoot && expr.Length > MaxInlineExpressionLength)
 			{
 				shouldSpill = true;
@@ -1277,7 +1292,8 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			{
 				var tempVar = $"ast_tmp{_astTempIndex++}";
 				tempMap[node] = tempVar;
-				tempLines.Add($"float {tempVar} = {expr};");
+				var width = GetExpressionWidth(node, widthCache);
+				tempLines.Add($"{GetTypeName(width)} {tempVar} = {expr};");
 				result = tempVar;
 			}
 			else
@@ -1294,6 +1310,7 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			HlslTreeNode node,
 			Dictionary<HlslTreeNode, int> useCounts,
 			Dictionary<HlslTreeNode, int> costCache,
+			Dictionary<HlslTreeNode, int> widthCache,
 			Dictionary<HlslTreeNode, string> tempMap,
 			List<string> tempLines,
 			Dictionary<HlslTreeNode, string> renderCache,
@@ -1306,6 +1323,10 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			}
 			if (node is RegisterInputNode regInput)
 			{
+				if (regInput.RegisterComponentKey.Type == RegisterType.Sampler)
+				{
+					return _registers.GetRegisterName(regInput.RegisterComponentKey.RegisterKey);
+				}
 				return regInput.ToHlsl(new HashSet<HlslTreeNode>(), 0);
 			}
 			if (node is TempValueNode tempNode)
@@ -1314,27 +1335,27 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			}
 			if (node is TextureLoadOutputNode texNode)
 			{
-				var sampler = EmitNodeExpression(texNode.SamplerInput, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
+				var sampler = EmitNodeExpression(texNode.SamplerInput, useCounts, costCache, widthCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
 				var coords = string.Join(", ",
 					texNode.TextureCoordinateInputs.Select(tc =>
-						EmitNodeExpression(tc, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth)));
+						EmitNodeExpression(tc, useCounts, costCache, widthCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth)));
 				return $"tex2D({sampler}, {coords})";
 			}
 			if (node is NormalizeOutputNode normalizeNode)
 			{
-				var inputExpr = EmitNodeExpression(normalizeNode.Inputs.FirstOrDefault(), useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
+				var inputExpr = EmitNodeExpression(normalizeNode.Inputs.FirstOrDefault(), useCounts, costCache, widthCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
 				return $"normalize({inputExpr})";
 			}
 			if (node is LogOperation logNode)
 			{
-				var inputExpr = EmitNodeExpression(logNode.Input, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
+				var inputExpr = EmitNodeExpression(logNode.Input, useCounts, costCache, widthCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth);
 				return $"log2({inputExpr})";
 			}
 
 			if (node is DXDecompiler.DX9Shader.Decompiler.Operations.Operation op)
 			{
 				var args = op.Inputs
-					.Select(input => EmitNodeExpression(input, useCounts, costCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth))
+					.Select(input => EmitNodeExpression(input, useCounts, costCache, widthCache, tempMap, tempLines, renderCache, spillRoot: false, visiting, depth))
 					.ToList();
 				switch (op.Mnemonic)
 				{
@@ -1358,13 +1379,29 @@ namespace DXDecompiler.DX9Shader.Decompiler
 					case "pow":
 						return $"pow({args[0]}, {args[1]})";
 					case "rcp":
+						if (op.Inputs.Count == 1 && op.Inputs[0] is DXDecompiler.DX9Shader.Decompiler.Operations.Operation rcpInputOp)
+						{
+							if (rcpInputOp.Mnemonic == "rsq" && rcpInputOp.Inputs.Count == 1)
+							{
+								var baseExpr = EmitNodeExpression(rcpInputOp.Inputs[0], useCounts, costCache, widthCache, tempMap, tempLines, renderCache, false, visiting, depth);
+								return $"sqrt({baseExpr})";
+							}
+						}
 						return $"(1.0 / {args[0]})";
 					case "rsq":
+						if (op.Inputs.Count == 1 && op.Inputs[0] is DXDecompiler.DX9Shader.Decompiler.Operations.Operation rsqInputOp)
+						{
+							if (rsqInputOp.Mnemonic == "rcp" && rsqInputOp.Inputs.Count == 1 && rsqInputOp.Inputs[0] is DXDecompiler.DX9Shader.Decompiler.Operations.Operation innerOp && innerOp.Mnemonic == "rsq" && innerOp.Inputs.Count == 1)
+							{
+								var baseExpr = EmitNodeExpression(innerOp.Inputs[0], useCounts, costCache, widthCache, tempMap, tempLines, renderCache, false, visiting, depth);
+								return $"rsqrt({baseExpr})";
+							}
+						}
 						return $"rsqrt({args[0]})";
 					case "lrp":
 						return $"lerp({args[2]}, {args[1]}, {args[0]})";
 					case "cmp":
-						return $"(({args[0]} >= 0) ? {args[1]} : {args[2]})";
+						return $"(({args[0]} >= 0) ? {NormalizeZeroLiteral(args[1])} : {NormalizeZeroLiteral(args[2])})";
 					case "sge":
 						return $"(({args[0]} >= {args[1]}) ? 1 : 0)";
 					case "slt":
@@ -1401,6 +1438,91 @@ namespace DXDecompiler.DX9Shader.Decompiler
 			}
 
 			return node.ToHlsl(new HashSet<HlslTreeNode>(), 0);
+		}
+
+		private static int GetExpressionWidth(HlslTreeNode node, Dictionary<HlslTreeNode, int> cache)
+		{
+			if (node == null)
+			{
+				return 1;
+			}
+			if (cache.TryGetValue(node, out var cached))
+			{
+				return cached;
+			}
+
+			int width = 1;
+			switch (node)
+			{
+				case ConstantNode:
+				case RegisterInputNode:
+				case VersionedRegisterInputNode:
+				case TempValueNode:
+				case TextureLoadOutputNode:
+				case NormalizeOutputNode:
+				case LogOperation:
+					width = 1;
+					break;
+				case DXDecompiler.DX9Shader.Decompiler.Operations.Operation op:
+					switch (op.Mnemonic)
+					{
+						case "dot":
+						case "cmp":
+						case "sge":
+						case "slt":
+						case "rcp":
+						case "rsq":
+						case "pow":
+						case "abs":
+						case "frc":
+						case "sin":
+						case "cos":
+						case "sqrt":
+						case "sign":
+							width = 1;
+							break;
+						default:
+							width = op.Inputs.Count == 0 ? 1 : op.Inputs.Max(i => GetExpressionWidth(i, cache));
+							break;
+					}
+					break;
+				default:
+					width = 1;
+					break;
+			}
+
+			cache[node] = width;
+			return width;
+		}
+
+		private static string GetTypeName(int width)
+		{
+			return width switch
+			{
+				1 => "float",
+				2 => "float2",
+				3 => "float3",
+				4 => "float4",
+				_ => "float"
+			};
+		}
+
+		private static string NormalizeZeroLiteral(string value)
+		{
+			if (string.IsNullOrWhiteSpace(value))
+			{
+				return value;
+			}
+			switch (value.Trim())
+			{
+				case "-0":
+				case "-0.0":
+				case "(-0)":
+				case "(-0.0)":
+					return "0";
+				default:
+					return value;
+			}
 		}
 
 		private string GetAssignmentTargetName(HlslTreeNode target)
